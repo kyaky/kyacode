@@ -1,0 +1,197 @@
+name: release
+
+# Build kyacode for every supported platform and attach the binaries to a
+# GitHub Release. Cross-compiles from ubuntu-latest with CGO disabled
+# (matches the README build recipe, so CI artifacts == local artifacts).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build and attach to (e.g. v4.1.0) — required so a manual dispatch can never build an artifact only main's tip vouches for"
+        required: true
+
+permissions:
+  contents: write
+
+# The release run is re-dispatchable (tag input, tagrel retry loop), so two
+# runs targeting the same tag can coexist. They race on
+# "gh release upload --clobber": each run's asset check can miss the other's
+# in-flight upload, and both uploads land (GitHub does not dedupe assets by
+# filename) — the release ends up with duplicate same-named assets and the
+# asset-count check fails, stranding it in draft. Pin one run per tag and
+# cancel stale duplicates.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    # CGO off for the WHOLE job: the vet/test gates must run under the
+    # same setting as the artifact build and the CI pin (release vet/test
+    # used to inherit the runner default while the build step pinned CGO
+    # off — a shape mismatch internal/hygiene enforces elsewhere).
+    env:
+      CGO_ENABLED: "0"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # darwin: arm64 (Apple Silicon) + amd64 (Intel)
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          # linux: amd64 (Rocky Linux target) + arm64 (aarch64 hosts)
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          # windows: amd64
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # Provenance pin: build EXACTLY the commit the tag names, on every
+        # path. The tag-push path already rectifies to the tag; the
+        # dispatch path (tagrel's retry loop, manual re-runs) previously
+        # checked out the triggering ref's tip — a commit landing on main
+        # between dispatch and checkout would be built and attached under
+        # the older tag. The tag input defaults through to ref_name with
+        # the same expression the version stamp uses, so what is built,
+        # what is stamped, and what the tag vouches for are one commit.
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Go cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-go-${{ matrix.goos }}-${{ matrix.goarch }}-
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          # Stamp the version being released so `kyacode version` can tell
+          # users what they run — same expression as the checkout pin, so
+          # the stamp IS the tag being vouched for.
+          VERSION: ${{ inputs.tag || github.ref_name }}
+        run: |
+          ext=""
+          [ "$GOOS" = "windows" ] && ext=".exe"
+          out="kyacode-${GOOS}-${GOARCH}${ext}"
+          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o "dist/${out}" ./cmd/kyacode
+          # shasum the artifact so users can verify downloads
+          ( cd dist && shasum -a 256 "${out}" > "${out}.sha256" )
+          ls -l dist/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kyacode-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/kyacode-*
+            !dist/*.sha256.tmp
+          if-no-files-found: error
+
+  release:
+    name: attach release assets
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || inputs.tag != ''
+    steps:
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "name=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+
+      - name: Checkout (the installer scripts live in the repo, not the artifacts)
+        # Provenance parity with the build job: rectify to exactly the
+        # commit the tag names, so the attached scripts are the scripts AT
+        # that tag — the same rule the build checkout pins. The scripts ride
+        # the release as assets (kyacode-install.sh/.ps1) because the
+        # kyaky.ai sync flow stages everything from one tagged release.
+        # This step MUST precede the
+        # artifact download: checkout cleans the workspace and would wipe
+        # a dist/ that already exists.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Add the installer scripts to the asset set
+        run: |
+          cp scripts/install.sh dist/kyacode-install.sh
+          cp scripts/install.ps1 dist/kyacode-install.ps1
+
+      - name: List assets
+        run: ls -l dist/
+
+      # Two-step release (readme-audit issue: release-attach-404): create a
+      # DRAFT release first, upload every asset against it sequentially,
+      # then publish. Publishing in one step made asset metadata PATCHes
+      # race the release's tag discoverability window (404 in the v4.1.0
+      # run even after the glob fix); a draft keeps the race window a
+      # controlled stage, and a failed attach can re-run via
+      # workflow_dispatch without leaving a half-published release.
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — leaving it in place"
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "kyacode $TAG" \
+              --generate-notes
+          fi
+
+      - name: Upload assets sequentially
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          for f in dist/kyacode-*; do
+            gh release upload "$TAG" "$f" --clobber
+          done
+          ls -l dist/ | wc -l
+          test "$(gh release view "$TAG" --json assets --jq '.assets | length')" -eq "$(ls dist/kyacode-* | wc -l)"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$TAG" --draft=false

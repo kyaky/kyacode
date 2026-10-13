@@ -1,0 +1,131 @@
+name: tagrel
+
+# Auto-tag on push to main: bumps the version from commit-message
+# prefixes (feat* => minor, otherwise patch; release: X.Y.Z overrides),
+# creates the annotated tag, and pushes it — which triggers the existing
+# release workflow to build and publish the binaries. Every commit that
+# lands on main after a release therefore ships a new release by default;
+# to skip a shipping cycle (e.g. docs-only churn), include the literal
+# string [no-release] in the commit message.
+#
+# Drive-by commits via the GitHub web UI get their conventional-commit
+# prefix from the PR title (squash merges) — keep the title prefixed.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: tagrel
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: bump + tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve next version
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh api "repos/${GITHUB_REPOSITORY}/tags?per_page=1" --jq '.[0].name' | sed 's/^v//;s/[^0-9.]//g')
+          [ -n "$last" ] || last="0.0.0"
+          major=$(cut -d. -f1 <<<"$last"); minor=$(cut -d. -f2 <<<"$last"); patch=$(cut -d. -f3 <<<"$last")
+
+          subject=$(git log -1 --format=%s "$GITHUB_SHA")
+          subject_lc=$(tr '[:upper:]' '[:lower:]' <<<"$subject")
+
+          # Explicit override: "release: 4.2.0" pins the exact version.
+          if regex='^release:[[:space:]]*v?([0-9]+\.[0-9]+\.[0-9]+)'; [[ $subject_lc =~ $regex ]]; then
+            next="${BASH_REMATCH[1]}"
+            echo "pinned by 'release:' prefix: $last -> $next"
+          elif grep -qi '\[no-release\]' <<<"$subject"; then
+            echo "skip=$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
+            echo "commit marked [no-release] — not tagging"
+            exit 0
+          elif cut -d: -f1 <<<"$subject_lc" | grep -q '^feat\|^fix\|feat(\|fix('; then
+            if grep -q '^feat\|feat(' <<<"$(cut -d: -f1 <<<"$subject_lc")"; then
+              minor=$((minor+1)); patch=0
+              echo "feat commit -> minor bump"
+            else
+              patch=$((patch+1))
+              echo "fix commit -> patch bump"
+            fi
+            next="$major.$minor.$patch"
+          else
+            patch=$((patch+1))
+            next="$major.$minor.$patch"
+            echo "no feat/fix prefix -> default patch bump"
+          fi
+
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Tag with release notes
+        if: steps.ver.outputs.next != ''
+        env:
+          TAG: v${{ steps.ver.outputs.next }}
+          MSGPATH: ${{ github.event_path }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists — skipping (race with a concurrent tag)"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Tag message = version highlights: every commit since the
+          # previous tag (oneline list), so the tag itself carries the
+          # what's-in-this-release description. The message file is built
+          # by python (quote-safe) from the webhook event file + git log;
+          # never interpolated into shell.
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$last_tag" ]; then
+            range="$last_tag..HEAD"
+          else
+            range="HEAD"
+          fi
+          git log --format='  - %s' --no-merges "$range" > /tmp/highlights.txt
+          python3 - "$TAG" "$last_tag" "$MSGPATH" > /tmp/tagmsg.txt <<'PYEOF'
+          import json, sys
+          tag, last_tag, event_path = sys.argv[1], sys.argv[2], sys.argv[3]
+          trigger = json.load(open(event_path)).get("head_commit", {}).get("message", "").strip()
+          lines = [l.rstrip() for l in open("/tmp/highlights.txt") if l.strip()]
+          out = [tag, "", f"Version highlights (commits since {last_tag or 'repo start'}):"]
+          out += lines
+          out += ["", "Automated tag from push to main — triggered by:"]
+          out += ["  " + l for l in trigger.splitlines()][:6]
+          print("\n".join(out))
+          PYEOF
+          git tag -a "$TAG" -F /tmp/tagmsg.txt
+          git push origin "$TAG"
+          # A tag pushed with the default GITHUB_TOKEN does NOT trigger
+          # other workflows (GitHub's recursion guard), so dispatch the
+          # release workflow explicitly — API calls are exempt. Dispatch
+          # on main is only the workflow-file context: the release build
+          # job checks out the commit the tag INPUT names (provenance
+          # pin), so the artifact matches what the tag vouches for. The
+          # just-pushed tag ref is authoritative by the time the build
+          # job runs; retry here only if the API rejects the dispatch.
+          ok=""
+          for i in 1 2 3 4 5; do
+            if gh workflow run release.yml --ref main -f "tag=$TAG"; then
+              ok=1; break
+            fi
+            echo "dispatch attempt $i failed — retrying"
+            sleep 5
+          done
+          [ -n "$ok" ] || { echo "could not dispatch release workflow for $TAG"; exit 1; }
+          echo "pushed $TAG and dispatched release workflow"

@@ -1,0 +1,16 @@
+# Dependabot keeps the supply-chain complement moving: the workflows pin
+# actions to full commit SHAs (verified once, enforced by
+# internal/hygiene's TestWorkflowActionsArePinnedToCommitShas), so the
+# github-actions entry is what re-pins them when a new release of an
+# action is wanted; the gomod entry covers the module's three
+# dependencies, whose vulnerabilities CI's govulncheck job reports on.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly

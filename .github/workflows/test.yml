@@ -1,0 +1,120 @@
+name: test
+
+# CI gate for every PR and every push to main. Previously tests only ran
+# inside the release matrix after a tag landed — a red build could sit on
+# main for a whole release cycle unnoticed. CGO off matches the release
+# builds (and the README build recipe). The windows leg exists because
+# platform-coupled behaviors (chmod mapping, RemoveAll retry, .cmd shim
+# discovery) are only executable there; both legs run the identical
+# commands so a platform-specific failure cannot hide behind the ubuntu
+# leg. Caching rides setup-go's built-in go.sum-keyed cache (one cache
+# layer, keyed per runner automatically).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: vet + test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+  # A dedicated arm the race detector can run (-race requires cgo; the
+  # pinned job above stays CGO-off to match the release recipe, so the
+  # detector could never ride it). The concurrency-critical publish-window
+  # and mutex-slot code finally gets checked by the one tool built for it.
+  # One linux leg is enough; windows -race needs a cgo toolchain story
+  # there. internal/hygiene pins this job's shape too.
+  race:
+    name: race detector
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Test with race detector
+        run: go test -race ./...
+
+  # First lint tier (#15): staticcheck, beyond vet. Run-based like the scan
+  # above (module-version pin, no action in the SHA pin table); its own
+  # job keeps the pinned vet+test shape untouched. The checked-in
+  # staticcheck.conf is the tier's scope; zero findings is the bar.
+  lint:
+    name: staticcheck
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # Pinned to 1.27.0 for the lint leg only: staticcheck v0.8.1 (the
+          # latest release) reads stdlib export data up to version 4, and
+          # go1.27.2's compiler emits version 5 — the toolchain bump that
+          # fixed the govulncheck findings broke this leg's reader, not the
+          # lint itself. Raise the pin when a staticcheck release supports
+          # the new export data.
+          go-version: "1.27.0"
+
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+
+  # Vulnerability scanning for the module's dependencies (#14): govulncheck
+  # fails the build on REACHABLE vulnerabilities. Run-based (`go run ...
+  # @vX`) deliberately — a new action would need an entry in the SHA pin
+  # table and a dependabot care loop; a module-version pin needs neither.
+  # Its own job keeps the pinned vet+test shape untouched.
+  vulnscan:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Scan for reachable vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...

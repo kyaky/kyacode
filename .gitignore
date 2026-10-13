@@ -1,0 +1,131 @@
+# ---------------------------------------------------------------------------
+# kyacode — Go single-binary CLI
+# ---------------------------------------------------------------------------
+
+# Compiled binaries / build output (regenerate with `go build ./cmd/kyacode`)
+/bin/
+/dist/
+/kyacode
+/kyacode.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go workspace / tool cache
+go.work
+go.work.sum
+
+# Test & coverage output
+*.test
+coverage.out
+*.cover
+
+# ---------------------------------------------------------------------------
+# research/ is vendored third-party source + release artifacts (~1.4 GB)
+# Only the analysis notes are kept in the repo; the downloaded ollama tree,
+# its binaries and packed archives are ignored.
+# ---------------------------------------------------------------------------
+/research/ollama/bin/
+/research/ollama/*.tar.zst
+/research/ollama/*.tar
+/research/ollama/*.tgz
+/research/ollama/release.json
+# vendored upstream sources under research/ are reference-only, not our code
+/research/ollama/src/
+
+# ---------------------------------------------------------------------------
+# Local tooling / editor / OS cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+# Windows OS droppings (this is a Windows dev box)
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Editor state: nothing here is tracked by decision
+/.vscode/
+/.idea/
+
+# Qwen Code session scratch (wakeup/task state, not project source)
+/.qwen/tmp/
+
+# Node tooling under .opencode (deps + generated lockfiles are ignored by
+# .opencode/.gitignore; keep the skills/ and commands/ sources tracked)
+/.opencode/node_modules/
+/.opencode/package.json
+/.opencode/package-lock.json
+/.opencode/bun.lock
+
+# Stray shell-redirect accidents (e.g. an accidental `2>1` creates a file "1")
+/1
+/2
+nohup.out
+# local release-asset builds (kyacode-<os>-<arch>; real assets ship from CI)
+/kyacode-*
+# scratch generator scripts (one-off report builders)
+/_gen.py
+
+# Logs & temp
+*.log
+*.tmp
+*.bak
+*~
+
+# ---------------------------------------------------------------------------
+# Secrets — NEVER commit keys/tokens/credentials
+# ---------------------------------------------------------------------------
+# env files holding API keys / tokens (local overrides included)
+.env
+.env.*
+.envrc
+!.env.example
+# key material of any shape
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Token-named artifacts are scoped to the repo ROOT on purpose: unscoped
+# `*token*` silently dropped every future tokenstore.go / token_test.go /
+# token_sweep fixture from a commit (the workspace-hygiene audit). The
+# root rule keeps the old CONTAINS semantics (`/*token*` also covers
+# gw_token.txt / oauth_keys.txt — a leading * in glob can be empty), while
+# subdirectory token-named code/fixtures track normally and token-NAMED
+# PROSE keeps the .md exception.
+/*token*
+!*token*.md
+# credential stores, likewise root-scoped so an auth.json FIXTURE or a
+# credentials.json schema file under internal/ never goes dark in a review
+/credentials.json
+/client_secret*.json
+/auth.json
+/.oauth_tokens.json
+# preserved after chmod'd token files (paranoia: any .kyacode workdir copy)
+.kyacode/
+
+# ---------------------------------------------------------------------------
+# Agent experiment scratch at the repo root — an untracked base64 blob or
+# debug dump was one `git add .` away from a commit in a repo whose daily
+# bread is a token tool (the workspace-hygiene audit's stray files: two
+# *.b64 blobs, a -out.txt pair). Scope keeps fixtures and docs untouched.
+# ---------------------------------------------------------------------------
+/*.b64
+/*-out.txt
+/scratch/
+
+# ---------------------------------------------------------------------------
+# Local agent tooling — per-machine scratch, never upload
+# ---------------------------------------------------------------------------
+/.agents/
+/.claude/
+/.qwen/
+/.scratch/
+/.out-of-scope/
+/skills-lock.json
+/.opencode/
