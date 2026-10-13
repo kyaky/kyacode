@@ -142,7 +142,7 @@ func TestReadmeCommandsMatchTheShapeTable(t *testing.T) {
 	}
 	slices.Sort(got)
 	want := shapeTableRowNames()
-	want = append(want, "help") // README:144 promises the help affordance
+	want = append(want, "help") // the README commands table promises the help affordance
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
 		t.Errorf("README commands table = %v, want the shapeTable set plus help %v", got, want)

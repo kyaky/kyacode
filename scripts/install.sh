@@ -6,8 +6,8 @@
 # existing install untouched and exits non-zero.
 #
 #   curl -fsSL https://kyaky.ai/kyacode/install.sh | sh
-#   curl -fsSL https://kyaky.ai/kyacode/install.sh | KYA_VERSION=v4.4.0 sh
-#   curl -fsSL https://kyaky.ai/kyacode/install.sh | sh -s v4.4.0
+#   curl -fsSL https://kyaky.ai/kyacode/install.sh | KYA_VERSION=v0.1.0 sh
+#   curl -fsSL https://kyaky.ai/kyacode/install.sh | sh -s v0.1.0
 #
 # Environment:
 #   KYA_VERSION           pin a tag (default latest)

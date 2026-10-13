@@ -271,12 +271,12 @@ func TestReadmeModelsRowRendersTheOwnedTimeout(t *testing.T) {
 func TestReadmeKeyChannelAndHomeRowsMatchTheDeclaredSets(t *testing.T) {
 	// (i) the env-export five: codex, droid, dsh, openclaw, pi.
 	exportLine := readmeLine(t, "additionally export")
-	i := strings.Index(exportLine, "Five sandbox rows — ")
+	i := strings.Index(exportLine, "Five sandbox rows (")
 	if i < 0 {
 		t.Fatalf("the env-export sentence lost its named set: %q", exportLine)
 	}
-	j := strings.Index(exportLine[i:], " — additionally export")
-	got := parseNameList(t, exportLine[i+len("Five sandbox rows — "):i+j])
+	j := strings.Index(exportLine[i:], ") additionally export")
+	got := parseNameList(t, exportLine[i+len("Five sandbox rows ("):i+j])
 	wantExport := []string{"codex", "droid", "dsh", "openclaw", "pi"}
 	if !reflect.DeepEqual(got, wantExport) {
 		t.Errorf("README env-export set = %v, want %v (the EnvRef/Dual runners' declared channels)", got, wantExport)
