@@ -18,6 +18,7 @@ not a policy promise.
 [![release](https://img.shields.io/badge/release-v0.1.1-2ea44f?style=flat-square)](https://github.com/kyaky/kyacode/releases)
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/dl/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/kyaky)
 
 ## Contents
 
