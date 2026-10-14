@@ -65,7 +65,7 @@ func TestWorkflowActionsArePinnedToCommitShas(t *testing.T) {
 
 		"actions/cache": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9", // v6.1.0
 
-		"actions/upload-artifact": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a", // v7.0.1
+		"actions/upload-artifact": "cf430e030ddbb5b0abf93d22962f4752f3646cd9", // v7.0.2
 
 		"actions/download-artifact": "9000827ccba6bdab643e8b6fd33ac0654aef8333", // v8.0.2
 	}
