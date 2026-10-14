@@ -115,7 +115,7 @@ The kyaky.ai Pages project's public/kyacode/ tree, served at https://kyaky.ai/ky
 _Avoid_: download server, CDN, mirror, origin (bare)
 
 **Sync**:
-The kyaky.ai-side ingestion of one release's assets (scripts/sync-kyacode.mjs there, runnable locally and via that repo's sync-kyacode workflow): anonymous download, every sidecar verified BEFORE anything is placed, exact-set check in both directions, flat + v<tag>/ placement, pin dirs pruned to the newest five, then a commit whose push fires the existing Pages deploy. A re-sync of the same tag is idempotent.
+The kyaky.ai-side ingestion of one release's assets (scripts/sync-kyacode.mjs there, runnable locally and via that repo's sync-kyacode workflow): anonymous download with an authenticated gh fallback, every sidecar verified BEFORE anything is placed, exact-set check in both directions, flat + v<tag>/ placement, pin dirs pruned to the newest five, then a commit and push; a local push triggers the existing Pages deploy, while the sync-kyacode workflow explicitly dispatches it because GITHUB_TOKEN pushes do not trigger workflows. A re-sync of the same tag is idempotent.
 _Avoid_: publish (the maintainer-run ssh placement this replaced), deploy (bare), release upload
 
 **Installer**:

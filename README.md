@@ -15,7 +15,7 @@ not a policy promise.
 <!-- The release badge is static and updated by hand (README churn must not
      trigger release cycles); `kyacode version` is the authoritative check
      for an installed binary's version. -->
-[![release](https://img.shields.io/badge/release-v0.1.0-2ea44f?style=flat-square)](https://github.com/kyaky/kyacode/releases)
+[![release](https://img.shields.io/badge/release-v0.1.1-2ea44f?style=flat-square)](https://github.com/kyaky/kyacode/releases)
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/dl/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
 
@@ -42,7 +42,7 @@ not a policy promise.
   `launch` where an official installer exists: claude and opencode use their
   own install scripts, the rest of the installable set installs via
   `npm install -g` (so Node.js/npm must be on `PATH`); see [Commands](#commands).
-- A valid KYA gateway key (see [kyaky.ai](https://kyaky.ai)).
+- A valid KYA gateway key (issued with your gateway deployment).
 
 ## Installing the binary
 
@@ -128,7 +128,8 @@ kyacode doctor                          # pre-flight: five gateway probes
 kyacode launch claude qwen3.8-27b-nvfp4
 ```
 
-Need a gateway key? See [kyaky.ai](https://kyaky.ai).
+The gateway key comes with your gateway deployment; kyacode itself does not
+issue keys.
 
 Model ids are gateway-specific: run `kyacode models` to list yours. Note
 that `kyacode models` lists every id the gateway serves, including
