@@ -1,8 +1,8 @@
-<!-- The release badge in the centered header below is static and updated by
+<!-- The release badge in the centred header below is static and updated by
      hand (README churn must not trigger release cycles); `kyacode version`
      is the authoritative check for an installed binary's version. -->
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v0.1.1-2ea44f?style=flat-square" alt="release v0.1.1">
+  <img src="https://img.shields.io/badge/release-v0.1.7-2ea44f?style=flat-square" alt="release v0.1.7">
   <img src="https://img.shields.io/badge/OpenAI-Compatible-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI Compatible">
   <img src="https://img.shields.io/badge/Anthropic-Compatible-191919?style=flat-square&logo=anthropic&logoColor=D97757" alt="Anthropic Compatible">
   <img src="https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.27">
@@ -13,11 +13,13 @@
 
 # kyacode
 
-Model traffic never has to leave your own perimeter. kyacode wires eleven
-coding harnesses (Claude Code, Codex, opencode, Qwen Code and seven more) to
-any OpenAI-compatible and Anthropic-compatible inference gateway, so
-prompts, completions and spawn-time wiring stay inside the perimeter you
-trust, under your own data governance, fast, with no metered token billing.
+Model traffic goes to the gateway you configure. kyacode wires eleven coding
+harnesses (Claude Code, Codex, opencode, Qwen Code and seven more) to
+OpenAI-compatible and Anthropic-compatible inference gateways. A gateway you
+host or place inside your perimeter can keep prompts, completions and
+spawn-time wiring inside that perimeter. Third-party gateways follow their
+own data-governance and billing terms. kyacode adds no metering or billing
+of its own.
 
 A single cgo-free Go binary takes your gateway key (stored locally), installs
 in one line on macOS, Linux and Windows, and injects the wiring (environment
@@ -44,10 +46,11 @@ not a policy promise.
 
 ## Requirements
 
-- One supported harness CLI. A missing harness is auto-installed on first
-  `launch` where an official installer exists: claude and opencode use their
-  own install scripts, the rest of the installable set installs via
-  `npm install -g` (so Node.js/npm must be on `PATH`); see [Commands](#commands).
+- One supported harness. A missing harness is auto-installed on first
+  `launch` where an official installer exists: claude uses its own install
+  script, opencode uses its own install script on POSIX and npm on Windows,
+  and the rest of the installable set installs via `npm install -g` (so
+  Node.js/npm must be on `PATH`); see [Commands](#commands).
 - A valid KYA gateway key (issued with your gateway deployment).
 
 ## Installing the binary
@@ -92,10 +95,15 @@ curl -fsSL https://kyaky.ai/kyacode/install.sh | sh -s v0.1.0
 (The intuitive `KYA_VERSION=v0.1.0 curl ... | sh` does nothing: the prefix
 binds the variable to `curl` only, and `sh` never sees it.)
 
+On Windows, the piped `irm | iex` run cannot take arguments, so pin that
+form by setting `KYA_VERSION` in the environment first; a downloaded copy
+of `install.ps1` (saved to a file and run) also takes `-Target vX.Y.Z`.
+
 Every install downloads the binary and its `.sha256` sidecar, verifies
 before replacing, and refuses, leaving the working binary intact, on any
-download or checksum failure. The one failure that prints nothing and exits
-0 with nothing installed is covered in [Troubleshooting](#troubleshooting).
+download or checksum failure. The one failure where `sh` receives an empty
+script and the pipeline still exits 0 with nothing installed is covered in
+[Troubleshooting](#troubleshooting).
 
 ### Updating
 
@@ -108,7 +116,9 @@ pinned `KYA_VERSION` install is equally repeatable.
 Run `kyacode unauth` to remove the stored key. Delete the binary
 (`~/.local/bin/kyacode` on POSIX, `%LOCALAPPDATA%\Programs\kyacode` on
 Windows, plus the user-PATH entry if you want it gone) and remove
-`~/.kyacode` for the leftover `config.json`. Per-launch sandboxes are
+`~/.kyacode` for the leftover `config.json`. A scripted install honours
+`KYACODE_INSTALL_DIR`, so if you set it, delete the binary from that
+directory instead of the defaults above. Per-launch sandboxes are
 cleaned on exit and swept by `kyacode status`, so they need no action.
 
 ### Verify the install
@@ -126,7 +136,10 @@ from source prints `v0.0.0-dev` and says so.
 
 > [!NOTE]
 > These commands assume `kyacode` is already on `PATH`; if it is not, start
-> with [Installing the binary](#installing-the-binary).
+> with [Installing the binary](#installing-the-binary). If your key comes
+> from your own gateway deployment, run `kyacode gateway <url>` first: the
+> default base is the maintainer's own instance, and `doctor` would
+> otherwise send your key there.
 
 ```bash
 kyacode auth                            # paste your gateway key (stored 0600 on unix)
@@ -139,8 +152,10 @@ issue keys.
 
 Model ids are gateway-specific: run `kyacode models` to list yours. Note
 that `kyacode models` lists every id the gateway serves, including
-embedding, rerank and speech families no harness can chat with; the launch
-wiring filters those out of the harness pickers, so pass a chat model id.
+embedding, rerank and speech families no harness can chat with. Only the
+codex catalog and the claude alias picker filter those out (a name
+heuristic; the model you pass explicitly is never overridden); the other
+catalog carriers list every served id, so pass a chat model id.
 
 The default gateway base is the maintainer's own instance (`https://kyaky.ai`,
 not a public service; it needs a key like any other). Point kyacode at any
@@ -148,14 +163,17 @@ OpenAI-compatible and Anthropic-compatible gateway with
 `kyacode gateway <url>`, or print the current setting with bare
 `kyacode gateway`.
 
-Pointing kyacode at your own instance? One `https://` base must answer all
-of: `POST /v1/messages` (Anthropic shape), `POST /v1/chat/completions` and
+Pointing kyacode at your own instance? The routes kyacode can use are:
+`POST /v1/messages` (Anthropic shape), `POST /v1/chat/completions` and
 `POST /v1/responses` (OpenAI shapes), and `GET /v1/models` returning an
-OpenAI-style `{"data":[{"id":...}]}` list. Every call carries the same key
-as a `Bearer` `Authorization` header, and a 3xx answer is refused outright
-(a redirect hop would carry the key). `kyacode doctor` checks a candidate
-base URL against all of these in one run. A trailing `/v1` on a pasted URL
-is accepted and stripped; the stored form is canonically without it.
+OpenAI-style `{"data":[{"id":...}]}` list. `kyacode doctor` checks a
+candidate base URL against all of them in one run. A base serving a subset
+still runs the harnesses whose wiring needs only those routes (qwen, cline
+and hermes speak one OpenAI route and fetch no catalog). Every call carries
+the same key as a `Bearer` `Authorization` header, and a 3xx answer is
+refused outright (a redirect hop would carry the key). A trailing `/v1` on
+a pasted URL is accepted and stripped; the stored form is canonically
+without it.
 
 ## Commands
 
@@ -178,8 +196,10 @@ kyacode launch claude <model> -- --continue
 ```
 
 Before `--`, the first argument is taken as the model only when it does not
-start with `-`; a leading flag goes to the harness instead. Any other extra
-argument before `--` is refused: harness flags belong after `--`. The
+start with `-`; a leading flag sends all remaining pre-`--` arguments to
+the harness as passthrough. The refusal applies only when a model argument
+is present: any other extra argument before `--` is refused, because
+harness flags belong after `--`. The
 single-model harnesses (see [Harness wiring](#harness-wiring)) refuse a
 launch with no model at all:
 `<harness> requires a model: kyacode launch <harness> <model> [-- extra args...]`
@@ -227,7 +247,7 @@ exports into harness sandboxes, is covered under [Harness wiring](#harness-wirin
 | variable               | effect                                                                |
 |------------------------|-----------------------------------------------------------------------|
 | `KYA_GATEWAY`          | override the gateway base URL (wins over config.json)                 |
-| `KYA_GATEWAY_INSECURE` | non-empty value allows plaintext `http://` to loopback hosts only     |
+| `KYA_GATEWAY_INSECURE` | a value with non-whitespace content allows plaintext `http://` to loopback hosts only     |
 
 ## Harness wiring
 
@@ -243,7 +263,7 @@ pure env injection (they leave no file behind), so they are listed first.
 | claude   | env: `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`      | no         |
 | opencode | env: `OPENCODE_CONFIG_CONTENT` (inline JSON)            | no         |
 | qwen     | env: `OPENAI_BASE_URL` + `OPENAI_API_KEY` + `OPENAI_MODEL` | no      |
-| codex    | sandbox: `CODEX_HOME` (`config.toml` + `auth.json` + `models.json`) | yes        |
+| codex    | sandbox: `CODEX_HOME` (`config.toml` + `auth.json`, plus `models.json` when the catalog renders) | yes        |
 | cline    | sandbox: `CLINE_DATA_DIR` (`providers.json`)            | yes        |
 | droid    | sandbox: HOME (`.factory/settings.json`)                | yes        |
 | pi       | sandbox: HOME (`.pi/agent/models.json`)                 | yes        |
@@ -262,8 +282,8 @@ discarded when the launch ends.
 claude, codex, droid, dsh, omp, openclaw, opencode and pi fetch
 the gateway's full model catalog at launch, so the harness's own picker can
 select among gateway models. droid, dsh, omp, openclaw, opencode and pi list
-every served id; codex lists the chat-capable ids; claude renders a bounded
-four-slot alias picker.
+every served id; codex lists the chat-capable ids when its catalog renders;
+claude renders a bounded four-slot alias picker.
 
 A model you pass becomes the default;
 with no model given, droid, dsh, omp, openclaw and pi pin the first real
@@ -271,19 +291,19 @@ id of a fetched catalog as the default
 (claude, codex and opencode never write a default: claude and codex
 refuse a model-less launch outright, so the typed model rides the
 spawn-time wiring, and opencode's own picker decides at startup, a choice
-deliberately held until its boot behavior is re-verified).
+deliberately held until its boot behaviour is re-verified).
 If the catalog is unavailable (a transient gateway outage) and no model was
 passed, no default is written anywhere and the catalog degrades to the
 `kya-model` placeholder row; what each harness then does at startup is its
-own fallback behavior.
+own fallback behaviour.
 
 omp, openclaw, opencode and pi take a BARE model id: they scope it
 themselves with the kya/ provider prefix, so a provider-scoped argument is
 refused at launch. The remaining harnesses wire the model their own way:
 droid takes a bare id on the command line (its CLI refuses scoped
 custom-model ids), dsh carries it in the sandbox config, and claude, cline,
-codex, hermes and qwen wire a single model only. Check `kyacode models` for
-the current list.
+codex, hermes and qwen take the typed model as their single entry model.
+Check `kyacode models` for the current list.
 
 ### 1M context with Claude Code
 
@@ -300,7 +320,7 @@ For the third row and any other unmeasured id, check the assumed window
 in-session with `/context`.
 
 So pass the suffix through: it is Claude Code's own convention, **stripped
-before the request leaves for the provider**, so the gateway never needs a
+before the request leaves for the provider**. The gateway never needs a
 model literally named `glm-5.3-flash-nvfp4[1m]`:
 
 ```bash
@@ -341,6 +361,8 @@ On Windows, `~` above is your user profile: the store lives at
 - `config.json` is written 0600 and re-chmod'd 0600 on every save, so even a
   pre-existing lax-mode file is tightened rather than tolerated. Same unix
   scoping as the token above.
+- The sandbox root's `0700` is a unix guarantee like the modes above; on
+  Windows, NTFS ACLs govern access.
 - `kyacode status` shows only a short preview of the stored key (first 3 and
   last 4 characters; keys shorter than 16 characters show no preview at
   all), never the full value.
@@ -383,11 +405,11 @@ On Windows, `~` above is your user profile: the store lives at
   error: the spawn wiring only points the harness at the gateway. Run
   `kyacode doctor` (a `401`/`403` row means the key was refused, so re-run
   `kyacode auth` with a fresh key) and confirm the id in `kyacode models`.
-- The one-line install prints nothing and exits 0 with nothing installed:
-  when the dist directory does not yet serve the requested script, curl
-  fails and the pipe feeds `sh` an empty script, which exits 0 silently (the
-  site's copy is behind the GitHub release). Retry later, or fetch the
-  binary from the
+- The one-line install exits 0 with nothing installed: when the dist
+  directory does not yet serve the requested script, curl fails (its own
+  error still prints on stderr) and the pipe feeds `sh` an empty script,
+  which exits 0 (the site's copy is behind the GitHub release). Retry
+  later, or fetch the binary from the
   [releases page](https://github.com/kyaky/kyacode/releases) directly.
 - A manual fetch from the GitHub release (the
   [Fallback](#fallback-fetch-from-the-github-release) section) returns 404
@@ -454,9 +476,13 @@ fetch_kyacode() {
   (cd "$t" && { sha256sum --check "kyacode-$os-$arch.sha256" 2>/dev/null \
                  || shasum -a 256 --check "kyacode-$os-$arch.sha256"; }) \
     || { rm -rf "$t"; echo "kyacode: checksum mismatch - refusing to install" >&2; return 1; }
-  mkdir -p ~/.local/bin
-  install -m 0755 "$t/kyacode-$os-$arch" ~/.local/bin/kyacode
+  mkdir -p ~/.local/bin || { rm -rf "$t"; return 1; }
+  if ! install -m 0755 "$t/kyacode-$os-$arch" ~/.local/bin/kyacode; then
+    rm -rf "$t"
+    return 1
+  fi
   rm -rf "$t"
+  return 0
 }
 fetch_kyacode && echo "installed to ~/.local/bin/kyacode"
 ```
@@ -534,7 +560,7 @@ kyacode is also a demonstration: local AI coding agents on commercial and
 open-source harnesses carrying a software project's full lifecycle
 (research, development, maintenance, release) through GitHub, with all model
 inference on the maintainer's own gateway under local data governance and
-sovereignty. 'Local' covers model inference; the harness CLIs keep their own
+sovereignty. 'Local' covers model inference; the harnesses keep their own
 upstream update and telemetry channels. The checkable record: the commit
 history, the CI and release workflows, and the hygiene tests that pin the
 docs to the code.
