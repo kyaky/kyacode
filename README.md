@@ -1,9 +1,22 @@
+<!-- The release badge in the centered header below is static and updated by
+     hand (README churn must not trigger release cycles); `kyacode version`
+     is the authoritative check for an installed binary's version. -->
+<p align="center">
+  <img src="https://img.shields.io/badge/release-v0.1.1-2ea44f?style=flat-square" alt="release v0.1.1">
+  <img src="https://img.shields.io/badge/OpenAI-Compatible-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI Compatible">
+  <img src="https://img.shields.io/badge/Anthropic-Compatible-191919?style=flat-square&logo=anthropic&logoColor=D97757" alt="Anthropic Compatible">
+  <img src="https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.27">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License">
+  <br><br>
+  <a href="https://buymeacoffee.com/kyaky" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;"></a>
+</p>
+
 # kyacode
 
 Model traffic never has to leave your own perimeter. kyacode wires eleven
 coding harnesses (Claude Code, Codex, opencode, Qwen Code and seven more) to
-a self-hosted KYA inference gateway (the default instance runs at kyaky.ai),
-so prompts, completions and spawn-time wiring stay inside the perimeter you
+any OpenAI-compatible and Anthropic-compatible inference gateway, so
+prompts, completions and spawn-time wiring stay inside the perimeter you
 trust, under your own data governance, fast, with no metered token billing.
 
 A single cgo-free Go binary takes your gateway key (stored locally), installs
@@ -11,17 +24,6 @@ in one line on macOS, Linux and Windows, and injects the wiring (environment
 variables and throwaway config files) at spawn time, so your real harness
 configuration is never touched. Data sovereignty is a property of the setup,
 not a policy promise.
-
-<!-- The release badge is static and updated by hand (README churn must not
-     trigger release cycles); `kyacode version` is the authoritative check
-     for an installed binary's version. -->
-[![release](https://img.shields.io/badge/release-v0.1.1-2ea44f?style=flat-square)](https://github.com/kyaky/kyacode/releases)
-[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/dl/)
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-
-<p align="center">
-  <a href="https://buymeacoffee.com/kyaky" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;"></a>
-</p>
 
 ## Contents
 
@@ -140,8 +142,9 @@ that `kyacode models` lists every id the gateway serves, including
 embedding, rerank and speech families no harness can chat with; the launch
 wiring filters those out of the harness pickers, so pass a chat model id.
 
-No gateway setup is needed for the default KYA deployment: `doctor`, `models`
-and `launch` target `https://kyaky.ai`. Point somewhere else with
+The default gateway base is the maintainer's own instance (`https://kyaky.ai`,
+not a public service; it needs a key like any other). Point kyacode at any
+OpenAI-compatible and Anthropic-compatible gateway with
 `kyacode gateway <url>`, or print the current setting with bare
 `kyacode gateway`.
 
