@@ -11,6 +11,10 @@
   <a href="https://buymeacoffee.com/kyaky" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;"></a>
 </p>
 
+<p align="center">
+  <img src="assets/banner.png" alt="kyacode banner: a terminal session wiring eleven coding harnesses to one gateway" width="100%">
+</p>
+
 # kyacode
 
 Model traffic goes to the gateway you configure. kyacode wires eleven coding
@@ -581,6 +585,7 @@ internal/gateway/    the one keyed transport to the gateway: /v1 join, Bearer sh
 internal/ladder/     the interrupt ladder: published handoff, escalation rungs, exit contract
 internal/procctl/    process-control primitives (group config, graceful rung, TERM rung, tree force)
 scripts/             the installer pair (install.sh, install.ps1)
+assets/              README banner artwork (banner.png)
 ```
 
 Decision records and internal analysis notes are intentionally not tracked
