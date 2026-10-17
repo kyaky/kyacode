@@ -349,12 +349,13 @@ the limit recovers only through Claude Code's own shrink-and-retry, which
 keys on the gateway's error wording. Prevent it instead: run
 `/autocompact 800000` once in a session on the model. It is saved under the
 model's base name in Claude Code's per-model settings (the `[1m]` spelling
-matches), is capped at the model's real window, and applies to every later
-session; the threshold lands about 33,000 tokens below the configured value,
-so on a 1,048,576-token backend the compaction request (full history plus a
-32,000-token summary budget) fits with room to spare, and 800,000 keeps a
-wide margin for the estimate error. For other window sizes keep the same
-ratio, roughly three quarters of the real limit. Two alternatives:
+matches), is capped at the window Claude Code assumes for the model, and
+applies to every later session; the threshold lands about 33,000 tokens
+below the configured value, so against a serving limit of 1,048,576 tokens
+the compaction request (full history plus a 32,000-token summary budget)
+fits with room to spare, and 800,000 keeps a wide margin for the estimate
+error. For other setups keep the value at roughly three quarters of the
+enforced context limit. Two alternatives:
 
 - `CLAUDE_CODE_AUTO_COMPACT_WINDOW=800000` in the environment behaves the
   same and is capped the same way, but it is process-global: it overrides
