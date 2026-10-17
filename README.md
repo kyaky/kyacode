@@ -336,6 +336,32 @@ Two caveats:
   (`--max-model-len` on the inference side), otherwise a long prompt fails
   with a prompt-too-long error rather than compacting.
 
+Compaction needs the same kind of hint, and gets less of one: on a `[1m]` id
+Claude Code runs no threshold auto-compact at all and defers to the gateway
+rejecting an over-limit request (verified on Claude Code 2.1.302). A long
+session therefore grows right up to the window before anything happens, and
+`/compact` itself re-sends the whole conversation, so a session already past
+the limit recovers only through Claude Code's own shrink-and-retry, which
+keys on the gateway's error wording. Prevent it instead: run
+`/autocompact 800000` once in a session on the model. It is saved under the
+model's base name in Claude Code's per-model settings (the `[1m]` spelling
+matches), is capped at the model's real window, and applies to every later
+session; the threshold lands about 33,000 tokens below the configured value,
+so on a 1,048,576-token backend the compaction request (full history plus a
+32,000-token summary budget) fits with room to spare, and 800,000 keeps a
+wide margin for the estimate error. For other window sizes keep the same
+ratio, roughly three quarters of the real limit. Two alternatives:
+
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW=800000` in the environment behaves the
+  same and is capped the same way, but it is process-global: it overrides
+  per-model `/autocompact` settings in every session launched from that
+  shell, so prefer `/autocompact` on mixed-window setups.
+- `CLAUDE_CODE_MAX_CONTEXT_TOKENS` does nothing on its own for a `[1m]` id
+  (the `[1m]` handling precedes it).
+
+With a window set, the status line switches from "% context used" to a
+"% until auto-compact" countdown; that is the expected form.
+
 `[1m]` is Claude Code only; it means nothing to Codex, opencode, Qwen Code
 or the other harnesses. To raise Qwen Code's window, set
 `generationConfig.contextWindowSize` on the model's `modelProviders` entry
@@ -405,6 +431,13 @@ On Windows, `~` above is your user profile: the store lives at
   error: the spawn wiring only points the harness at the gateway. Run
   `kyacode doctor` (a `401`/`403` row means the key was refused, so re-run
   `kyacode auth` with a fresh key) and confirm the id in `kyacode models`.
+- A long session on a `[1m]` model never auto-compacts, and `/compact` fails
+  with a 400 about the input exceeding the model's context length: expected
+  on a 1M id, where Claude Code defers compaction to the gateway. Run
+  `/autocompact 800000` once in a session on the model (it persists for that
+  model and re-arms threshold compaction with headroom to spare); see
+  [1M context with Claude Code](#1m-context-with-claude-code) for the
+  alternatives and for recovering a session that is already over the limit.
 - The one-line install exits 0 with nothing installed: when the dist
   directory does not yet serve the requested script, curl fails (its own
   error still prints on stderr) and the pipe feeds `sh` an empty script,
