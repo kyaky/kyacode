@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/banner.png" alt="kyacode banner: a terminal session wiring eleven coding harnesses to one gateway" width="100%">
+  <img src="assets/banner.png" alt="kyacode banner: one key-bearing gateway hub wiring eleven terminal harnesses" width="100%">
 </p>
 
 # kyacode
