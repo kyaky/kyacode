@@ -18,6 +18,7 @@ import (
 	"kyacode/internal/gateway"
 	"kyacode/internal/harness"
 	"kyacode/internal/ladder"
+	"kyacode/internal/shim"
 )
 
 // Version is stamped into release builds via -ldflags "-X main.Version=…"
@@ -34,6 +35,16 @@ func main() {
 	// stream directly: it runs after run() has returned, outside every
 	// command body.
 	ch := defaultChannels()
+	// The engine personality dispatches FIRST, before the CLI's argc
+	// gate: a binary the extension spawned as its codex engine carries
+	// codex's argv, which no kyacode subcommand can parse. The dispatch
+	// is name-plus-install-dir (see shim.InvokedAsEngine), so the CLI is
+	// untouched for every other invocation shape and the shim writes its
+	// own diagnostics to the process's real stderr — the channel seam
+	// below is the CLI report surface, not the engine's.
+	if shim.InvokedAsEngine() {
+		os.Exit(shim.Run())
+	}
 	if len(os.Args) < 2 {
 		usage(ch.stdout)
 		os.Exit(tierUsageMisuse)
@@ -77,6 +88,8 @@ func run(args []string, h *ladder.Handoff, ch channels) error {
 		err = runShape("unauth", args[1:], ch, func(_ []string, ch channels) error { return cmdUnauth(ch) })
 	case "gateway":
 		err = runShape("gateway", args[1:], ch, cmdGateway)
+	case "desktop":
+		err = runShape("desktop", args[1:], ch, cmdDesktop)
 	case "doctor":
 		err = runShape("doctor", args[1:], ch, func(_ []string, ch channels) error { return cmdDoctor(ch) })
 	case "status":
@@ -109,6 +122,9 @@ Usage:
   kyacode status            Key / gateway / harness overview
   kyacode models            List gateway models (direct, `+gateway.RequestTimeout.String()+` timeout)
   kyacode launch <harness> [model] [-- extra args...]
+  kyacode desktop on|off|status|open
+                             Wire, unwire, inspect or launch the ChatGPT
+                             desktop app on the gateway (experimental)
   kyacode version           Print the build's version
   kyacode help              Show this usage (-h / --help)
 

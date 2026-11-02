@@ -107,6 +107,12 @@ var shapeTable = []argShape{
 		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
 	},
 	{
+		// desktop's exactly-one argument is the ACTION (on|off|status|
+		// open); the body owns the action vocabulary and its refusals.
+		name: "desktop", maxArgs: 1, helpFirst: true, noun: "action",
+		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
+	},
+	{
 		name: "doctor", maxArgs: 0,
 		leak: echoFree, style: noArgs, tier: tierFailedCommand,
 	},
