@@ -290,14 +290,17 @@ func Save(s Setting) error {
 
 // validateTokenShape rejects tokens that cannot travel safely:
 // control characters (CR/LF would make net/http reject the Authorization
-// header outright, and would corrupt the codex auth.json embedding).
+// header outright, and would corrupt the codex auth.json embedding), and
+// the byte-order mark U+FEFF - invisible, survives the control-char
+// class, and would ride into the Authorization header as a silent 401
+// (observed live: a PowerShell-piped `auth --stdin` prepends a BOM).
 func validateTokenShape(tok string) error {
 	if len(tok) < 8 {
 		return fmt.Errorf("token too short (got %d chars, want >= 8)", len(tok))
 	}
 	for _, r := range tok {
-		if r < 0x20 || r == 0x7f {
-			return fmt.Errorf("token contains control characters (only printable keys are storable)")
+		if r < 0x20 || r == 0x7f || r == 0xfeff {
+			return fmt.Errorf("token contains control characters or a byte-order mark (only printable keys are storable)")
 		}
 	}
 	return nil

@@ -734,3 +734,16 @@ func TestDeleteTokenReclaimsResidueWithoutAFinalFile(t *testing.T) {
 		t.Fatalf("residue must be reclaimed even with no final file: %v", err)
 	}
 }
+
+// TestValidateTokenShapeRejectsBOM pins the byte-order-mark rejection: a
+// BOM survives the control-char class, is invisible in every editor, and
+// would ride into the Authorization header as a silent 401 (observed
+// live from a PowerShell-piped `auth --stdin`).
+func TestValidateTokenShapeRejectsBOM(t *testing.T) {
+	if err := validateTokenShape("sk-key\uFEFF-with-bom-123"); err == nil || !strings.Contains(err.Error(), "byte-order mark") {
+		t.Fatalf("validateTokenShape(BOM-prefixed) = %v, want the byte-order-mark refusal", err)
+	}
+	if err := validateTokenShape("sk-clean-key-123"); err != nil {
+		t.Fatalf("validateTokenShape(clean) = %v, want nil", err)
+	}
+}
