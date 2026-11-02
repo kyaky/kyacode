@@ -79,6 +79,10 @@ type Sandbox struct {
 	root    string
 	channel Channel
 	token   string
+	// persistent marks a Named home: one whose lifecycle is the user's,
+	// not the launch's. Cleanup consults it — a persistent home is never
+	// reclaimed by a launch exit, whatever path calls Cleanup.
+	persistent bool
 
 	mu   sync.Mutex
 	done bool
@@ -112,6 +116,80 @@ func namePattern(prefix string, pid int) string {
 // literal — an anchored always-valid pattern.
 func NameShape(prefix string) *regexp.Regexp {
 	return regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + `-[0-9]+-[0-9]+$`)
+}
+
+// persistentNameShape is the guard against a Named name that would look
+// like a pid-random sandbox tail to the orphan sweep: the sweep matches
+// ^<prefix>-<pid>-<random>$ for registry prefixes, so a persistent home
+// named "codex-1-2" could be reclaimed by a concurrent `kyacode status`.
+// Any name whose whole shape is alpha-pid-decimal is refused here — the
+// grammar's cheapest collision-proofing, checked at the only place a
+// Named name enters the tree.
+var persistentNameShape = regexp.MustCompile(`^[a-z0-9]+-[0-9]+-[0-9]+$`)
+
+// Named reopens (or creates) a FIXED-NAME private dir under ~/.kyacode:
+// the persistent-home shape the codex GUI runner needs. Where New builds
+// a throwaway per-launch dir that dies with the launch, a Named home
+// outlives every launch on purpose — a GUI's app-server keeps running
+// inside the editor long after `kyacode launch` has returned — and its
+// persistence is structural, not hopeful:
+//
+//   - The name is fixed, so it can never match the orphan sweep's
+//     <prefix>-<pid>-<random> grammar (NameShape) — `kyacode status`
+//     cannot reclaim a live GUI home, and no registration can change
+//     that, because the name carries no pid-random tail at all.
+//   - Cleanup on a Named sandbox is deliberately a NO-OP: the home's
+//     lifecycle belongs to the operator (remove it by hand or with a
+//     future maintenance command), never to a launch exit path. A
+//     deferred w.Cleanup() that reaches a Named sandbox therefore
+//     touches nothing.
+//   - The dir is created exactly like a sandbox root: create-if-missing
+//     0700 with existing-mode conservation and the fail-closed write
+//     probe, so a home the launch cannot write to fails before any
+//     wiring file lands in it.
+//
+// The name must be a single lowercase path segment; a name shaped like a
+// pid-random sandbox tail is refused (see persistentNameShape) rather
+// than allowed to enter the sweep's blast radius.
+func Named(name string, opts ...Option) (*Sandbox, error) {
+	if name == "" {
+		return nil, fmt.Errorf("sandbox: empty name")
+	}
+	if !persistentNameOK(name) {
+		return nil, fmt.Errorf("sandbox: %q is not a valid persistent-home name", name)
+	}
+	if persistentNameShape.MatchString(name) {
+		return nil, fmt.Errorf("sandbox: %q collides with the orphan sweep's pid-random shape — pick a name with a non-numeric tail", name)
+	}
+	s := settings{channel: FileOnly}
+	for _, o := range opts {
+		o(&s)
+	}
+	d, err := rootDir()
+	if err != nil {
+		return nil, err
+	}
+	root := filepath.Join(d, name)
+	if err := ensurePrivateDir(root); err != nil {
+		return nil, err
+	}
+	return &Sandbox{root: root, channel: s.channel, token: s.token, persistent: true}, nil
+}
+
+// persistentNameOK validates a Named home's name as a single lowercase
+// path segment (no separators, no dots, no whitespace) so the name can
+// never escape ~/.kyacode or smuggle a subpath.
+func persistentNameOK(name string) bool {
+	if len(name) == 0 || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			continue
+		}
+		return false
+	}
+	return name[0] >= 'a' && name[0] <= 'z'
 }
 
 // New creates a fresh, collision-free sandbox root under ~/.kyacode
@@ -241,6 +319,13 @@ func (s *Sandbox) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.done {
+		return
+	}
+	if s.persistent {
+		// A Named home persists by design (see Named): a launch exit —
+		// clean, interrupted, or forced — must never reclaim it. Marking
+		// done keeps the idempotency contract without touching the dir.
+		s.done = true
 		return
 	}
 	s.done = true
