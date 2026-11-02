@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"kyacode/internal/harness/sandbox"
+	"kyacode/internal/shim"
 )
 
 // TestSweepOrphansRemovesOnlyWellFormedSandboxDirs pins the sweep's match
@@ -185,6 +186,21 @@ func TestRunnerSandboxesMatchTheSweepsOwnNamePredicate(t *testing.T) {
 				t.Fatalf("%s: wire carries no sandbox root", s.Name)
 			}
 			name := filepath.Base(root)
+			if s.PersistentHome {
+				// The persistent-home contract INVERTS (Spec.PersistentHome):
+				// the dir is the declared fixed name, never a per-launch
+				// shape, and it must sit OUTSIDE the sweep's grammar — the
+				// home is key-free by the key-channel walk and must be
+				// unreclaimable while a live editor session runs. A match
+				// here would let `kyacode status` reclaim it after 24h.
+				if name != shim.HomeName {
+					t.Errorf("persistent home %s is not the declared fixed name %q", name, shim.HomeName)
+				}
+				if isSandboxName(name) {
+					t.Errorf("persistent home %s matches the sweep grammar — the sweep could reclaim a live editor session", name)
+				}
+				return
+			}
 			if !strings.HasPrefix(name, s.SandboxPrefix+"-") {
 				t.Errorf("created dir %s does not carry the declared prefix %q", name, s.SandboxPrefix)
 			}

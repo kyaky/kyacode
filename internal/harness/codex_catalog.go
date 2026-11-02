@@ -148,6 +148,17 @@ var codexCatalogEntryHarvest = func(home string) (map[string]any, bool) {
 	if !found {
 		return nil, false
 	}
+	return codexCatalogEntryHarvestFrom(codexPath, home)
+}
+
+// codexCatalogEntryHarvestFrom is the explicit-binary arm of the same
+// acquisition: the codex GUI runner must harvest from the EXACT binary
+// it records as the shim's engine (the review's certified-tuple rule —
+// a harvest from PATH while the record names another binary would let
+// the two drift), so it hands the resolved path in instead of hunting.
+// It is a var seam for the same hermetic-test reason the home-locating
+// arm above is.
+var codexCatalogEntryHarvestFrom = func(codexPath, home string) (map[string]any, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, codexPath, "debug", "models")

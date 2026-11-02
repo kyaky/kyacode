@@ -324,7 +324,8 @@ func TestCodexQuoteJSONSurvivesHostileToken(t *testing.T) {
 func stubCodexHarvest(t *testing.T) {
 	t.Helper()
 	original := codexCatalogEntryHarvest
-	codexCatalogEntryHarvest = func(string) (map[string]any, bool) {
+	originalFrom := codexCatalogEntryHarvestFrom
+	entry := func() (map[string]any, bool) {
 		return map[string]any{
 			"slug":         "gpt-6-sol",
 			"visibility":   "list",
@@ -336,7 +337,16 @@ func stubCodexHarvest(t *testing.T) {
 			},
 		}, true
 	}
-	t.Cleanup(func() { codexCatalogEntryHarvest = original })
+	// Both arms stub together: the codex GUI runner harvests through the
+	// explicit-binary arm (its certified-tuple rule names the exact
+	// engine), so a stub that missed it would spawn the installed codex
+	// inside a hermetic test.
+	codexCatalogEntryHarvest = func(string) (map[string]any, bool) { return entry() }
+	codexCatalogEntryHarvestFrom = func(string, string) (map[string]any, bool) { return entry() }
+	t.Cleanup(func() {
+		codexCatalogEntryHarvest = original
+		codexCatalogEntryHarvestFrom = originalFrom
+	})
 }
 
 // buildCodexWirePair is the codex wire builder for tests that drive the

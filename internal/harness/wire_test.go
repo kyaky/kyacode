@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kyacode/internal/harness/sandbox"
+	"kyacode/internal/shim"
 )
 
 // eqEnv compares env-shaped expectations positionally: for the child env
@@ -135,7 +136,17 @@ func TestLaunchersWiresCarryTheLaunchFacts(t *testing.T) {
 			if w.Root == "" || !testDirWithin(home, w.Root) {
 				t.Fatalf("wire root %q is not a dir inside the isolated home %s", w.Root, home)
 			}
-			if !strings.HasPrefix(filepath.Base(w.Root), s.SandboxPrefix+"-") {
+			if s.PersistentHome {
+				// The persistent home is the declared fixed name; the
+				// per-launch prefix grammar must never match it (the
+				// sweep's reclaim would hit a live editor session).
+				if filepath.Base(w.Root) != shim.HomeName {
+					t.Errorf("persistent root %q is not the declared fixed home %q", w.Root, shim.HomeName)
+				}
+				if isSandboxName(filepath.Base(w.Root)) {
+					t.Errorf("persistent root %q matches the sweep grammar", w.Root)
+				}
+			} else if !strings.HasPrefix(filepath.Base(w.Root), s.SandboxPrefix+"-") {
 				t.Errorf("root %q does not carry the declared prefix %q", w.Root, s.SandboxPrefix)
 			}
 			if w.Cleanup == nil {
@@ -149,8 +160,18 @@ func TestLaunchersWiresCarryTheLaunchFacts(t *testing.T) {
 			// what the ticket killed. dsh is the deliberate exception: its
 			// env carries the credential row alone (frozen full shape,
 			// TestDSHBuildEnvDeliversPatchRedirectAsArgs) and the root
-			// rides the Wire.
-			if s.Name != "dsh" {
+			// rides the Wire. A persistent home inverts the requirement:
+			// its launch child is the EDITOR CLI (the engine is the
+			// shim's own spawn), so the editor child carries NO env rows
+			// at all — no CODEX_HOME (it would not survive the
+			// single-instance handoff and would half-wire the extension)
+			// and no credential row (the key belongs in the shim's spawn
+			// alone, never the editor's process tree).
+			if s.PersistentHome {
+				if len(w.Env) != 0 {
+					t.Errorf("persistent-home runner %s injects env rows into the editor child (%v) — the shim owns the engine wiring", s.Name, w.Env)
+				}
+			} else if s.Name != "dsh" {
 				wantRedirect := map[string]string{
 					"codex":    "CODEX_HOME=" + w.Root,
 					"cline":    "CLINE_DATA_DIR=" + w.Root,
@@ -169,7 +190,11 @@ func TestLaunchersWiresCarryTheLaunchFacts(t *testing.T) {
 				}
 			}
 			w.Cleanup()
-			if _, err := os.Stat(w.Root); !os.IsNotExist(err) {
+			if s.PersistentHome {
+				if _, err := os.Stat(w.Root); err != nil {
+					t.Errorf("persistent home must survive the launch cleanup; stat err = %v", err)
+				}
+			} else if _, err := os.Stat(w.Root); !os.IsNotExist(err) {
 				t.Errorf("cleanup must remove the sandbox dir; stat err = %v", err)
 			}
 		})
@@ -211,6 +236,12 @@ func TestLaunchersWireArgsAreTheRunnerOwnArgv(t *testing.T) {
 				// serving the /model picker the gateway's own rows. The
 				// hand-spelled baseline lives in wantCodexWiring.
 				"codex":    codexWantArgs(model, filepath.Join(w.Root, "models.json")),
+				// codex-gui's child is the EDITOR CLI, never the engine:
+				// the argv opens a new VS Code window on the launch
+				// directory and the extension inside it reaches the shim
+				// through its own configured path. The wiring rides the
+				// persistent home's config.toml, not this argv.
+				"codex-gui": codexGuiWantArgs(t),
 				"droid":    {"-m", "m1"},
 				"cline":    {"-m", "m1"},
 				"hermes":   {"--model", "m1"},
@@ -225,6 +256,19 @@ func TestLaunchersWireArgsAreTheRunnerOwnArgv(t *testing.T) {
 			eqArgs(t, w.Args, rows)
 		})
 	}
+}
+
+// codexGuiWantArgs is the codex-gui row's expectation: the editor CLI
+// opens the launch directory. The build read os.Getwd() at build time and
+// the test reads the same process cwd here, so the two agree wherever the
+// suite runs.
+func codexGuiWantArgs(t *testing.T) []string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd: %v", err)
+	}
+	return []string{"-n", wd}
 }
 
 // TestLaunchComposesWireArgsThenExtra pins the ONE merge site: the child

@@ -118,7 +118,12 @@ func TestShellFileRunnerRealKeyEmbedded(t *testing.T) {
 		"omp":      {wantValue: true},
 		"hermes":   {wantValue: true},
 		"codex":    {wantValue: true, nameAllowed: []string{"config.toml"}},
-		"dsh":      {wantValue: false, nameAllowed: []string{"settings.yaml"}},
+		// codex-gui writes NO credential file: the persistent home holds
+		// no key (the config references the env-var NAME at the same
+		// env_key site codex's does), so wantValue=false is the pin that
+		// keeps an auth.json from creeping back into the GUI home.
+		"codex-gui": {wantValue: false, nameAllowed: []string{"config.toml"}},
+		"dsh":       {wantValue: false, nameAllowed: []string{"settings.yaml"}},
 	}
 	// Registry-keyed, like the wiring matrix: a registered sandbox runner
 	// with no row fails with the extend-the-table refusal — the
@@ -203,10 +208,14 @@ func TestNewSandboxRunners(t *testing.T) {
 		"droid":    {prefix: "droid", wantFile: ".factory/settings.json", wantKey: "sk-test-12345", keyInEnv: true, dirEnv: "HOME"},
 		"pi":       {prefix: "pi", wantFile: ".pi/agent/models.json", wantKey: "sk-test-12345", keyInEnv: true, dirEnv: "HOME"},
 		"openclaw": {prefix: "openclaw", wantFile: ".openclaw/openclaw.json", wantKey: "sk-test-12345", keyInEnv: true, dirEnv: "HOME"},
-		"codex":    {prefix: "codex"},  // layout pinned in harness_test.go (auth.json + config.toml)
-		"dsh":      {prefix: "dsh"},    // layout pinned in wire_test.go (patch pair + frozen env; NO redirect row — its env is the credential row alone)
-		"hermes":   {prefix: "hermes"}, // layout pinned in hermes_providers_test.go
-		"omp":      {prefix: "omp"},    // layout pinned in omp_env_test.go (PI_CODING_AGENT_DIR carries the agent/ subdir)
+		"codex":  {prefix: "codex"}, // layout pinned in harness_test.go (auth.json + config.toml)
+		// codex-gui: layout pinned in codex_gui_test.go (config.toml +
+		// models.json + runtime.json, NO auth.json); the home is the
+		// fixed-name persistent sandbox (PersistentHome).
+		"codex-gui": {prefix: "codexgui"},
+		"dsh":       {prefix: "dsh"},    // layout pinned in wire_test.go (patch pair + frozen env; NO redirect row — its env is the credential row alone)
+		"hermes":    {prefix: "hermes"}, // layout pinned in hermes_providers_test.go
+		"omp":       {prefix: "omp"},    // layout pinned in omp_env_test.go (PI_CODING_AGENT_DIR carries the agent/ subdir)
 	}
 
 	runners := sandboxRunners()

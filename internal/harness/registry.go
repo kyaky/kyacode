@@ -62,6 +62,22 @@ type Spec struct {
 	// WiringSandbox, forbidden for WiringEnv.
 	SandboxPrefix string
 
+	// PersistentHome marks a sandbox-wired runner whose dir is a
+	// FIXED-NAME persistent home (sandbox.Named) rather than a per-launch
+	// throwaway: a GUI's app-server outlives every launch, so the home
+	// must survive the launch's cleanup — Cleanup on a Named sandbox is a
+	// no-op by contract. The orphan-sweep contract INVERTS with the flag:
+	// the home's fixed name can never match the pid-random grammar, which
+	// is precisely what keeps `kyacode status` from reclaiming a live
+	// editor session, and the safety argument changes shape — a throwaway
+	// sandbox must be sweep-matchable because it holds the key; a
+	// persistent home must be sweep-unmatchable and holds no key (its
+	// carrier body writes no credential file; the key rides the runner's
+	// own spawn-time channel). Declared, never derived: the contract
+	// tests branch on this fact instead of sniffing dir shapes.
+	// WiringSandbox-only; forbidden beside WiringEnv.
+	PersistentHome bool
+
 	// Find locates the harness executable.
 	Find func() (string, bool)
 	// Install is the official installer when missing (nil: none).
@@ -132,6 +148,7 @@ func init() {
 		claudeSpec,
 		opencodeSpec,
 		codexSpec,
+		codexGuiSpec,
 		qwenSpec,
 		hermesSpec,
 		ompSpec,
@@ -194,6 +211,9 @@ func validate(s Spec) error {
 		}
 		if s.SandboxPrefix != "" {
 			return fmt.Errorf("harness: %q declares WiringEnv with sandbox prefix %q it never materialises", s.Name, s.SandboxPrefix)
+		}
+		if s.PersistentHome {
+			return fmt.Errorf("harness: %q declares WiringEnv with a persistent home the env class never materialises", s.Name)
 		}
 		return nil
 	}

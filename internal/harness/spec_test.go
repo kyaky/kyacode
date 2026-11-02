@@ -327,18 +327,20 @@ func TestRegisteredSpecsDeclareTheWiringMatrix(t *testing.T) {
 		hasArgs  bool // env path declares --model-style own argv
 		install  bool // declares an official installer (nil Install: none)
 		prefix   string
+		persist  bool // the dir is a fixed-name persistent home, not a throwaway
 	}{
-		{"claude", WiringEnv, true, false, true, false, true, ""},
-		{"opencode", WiringEnv, false, true, true, false, true, ""},
-		{"codex", WiringSandbox, true, false, true, false, true, "codex"},
-		{"qwen", WiringEnv, true, false, false, true, false, ""},
-		{"hermes", WiringSandbox, true, false, false, false, false, "hermes"},
-		{"omp", WiringSandbox, false, true, true, false, true, "omp"},
-		{"dsh", WiringSandbox, false, false, true, false, true, "dsh"},
-		{"cline", WiringSandbox, true, false, false, false, true, "cline"},
-		{"droid", WiringSandbox, false, false, true, false, true, "droid"},
-		{"pi", WiringSandbox, false, true, true, false, true, "pi"},
-		{"openclaw", WiringSandbox, false, true, true, false, false, "openclaw"},
+		{"claude", WiringEnv, true, false, true, false, true, "", false},
+		{"opencode", WiringEnv, false, true, true, false, true, "", false},
+		{"codex", WiringSandbox, true, false, true, false, true, "codex", false},
+		{"codex-gui", WiringSandbox, true, false, true, false, true, "codexgui", true},
+		{"qwen", WiringEnv, true, false, false, true, false, "", false},
+		{"hermes", WiringSandbox, true, false, false, false, false, "hermes", false},
+		{"omp", WiringSandbox, false, true, true, false, true, "omp", false},
+		{"dsh", WiringSandbox, false, false, true, false, true, "dsh", false},
+		{"cline", WiringSandbox, true, false, false, false, true, "cline", false},
+		{"droid", WiringSandbox, false, false, true, false, true, "droid", false},
+		{"pi", WiringSandbox, false, true, true, false, true, "pi", false},
+		{"openclaw", WiringSandbox, false, true, true, false, false, "openclaw", false},
 	}
 	seen := map[string]bool{}
 	for _, row := range rows {
@@ -372,6 +374,9 @@ func TestRegisteredSpecsDeclareTheWiringMatrix(t *testing.T) {
 		}
 		if s.SandboxPrefix != row.prefix {
 			t.Errorf("%s: SandboxPrefix = %q, want %q", row.name, s.SandboxPrefix, row.prefix)
+		}
+		if s.PersistentHome != row.persist {
+			t.Errorf("%s: PersistentHome = %v, want %v", row.name, s.PersistentHome, row.persist)
 		}
 	}
 	for _, name := range Names() {
