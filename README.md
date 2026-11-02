@@ -190,6 +190,7 @@ without it.
 | `kyacode status`                                 | key / gateway / harness overview; runs the orphan sweep                                           |
 | `kyacode models`                                 | list gateway models (10s timeout)                                                                 |
 | `kyacode launch <harness> [model] [-- extra args...]` | spawn a harness against the gateway                                                          |
+| `kyacode desktop on\|off\|status\|open`          | wire, unwire, inspect or launch the ChatGPT desktop app on the gateway (experimental)             |
 | `kyacode version`                                | print the build's version (tagged releases stamp semver)                                          |
 | `kyacode help`                                   | usage (`-h` / `--help`)                                                                           |
 
@@ -262,12 +263,19 @@ throwaway sandbox that your normal harness sessions never read. Rows marked
 returns, including on Ctrl-C/SIGTERM/SIGHUP. The first three harnesses are
 pure env injection (they leave no file behind), so they are listed first.
 
+The one persistent exception is codex-gui: its home is the fixed directory
+`~/.kyacode/codex-gui/` (0700), which survives every launch because the
+editor's app-server outlives them. It holds no key (the gateway key rides the
+engine shim's spawn-time environment only), so persistence is state on disk,
+not a credential at rest, and the orphan sweep can never match its fixed name.
+
 | harness  | wiring                                                 | persisted? |
 |----------|--------------------------------------------------------|------------|
 | claude   | env: `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`      | no         |
 | opencode | env: `OPENCODE_CONFIG_CONTENT` (inline JSON)            | no         |
 | qwen     | env: `OPENAI_BASE_URL` + `OPENAI_API_KEY` + `OPENAI_MODEL` | no      |
 | codex    | sandbox: `CODEX_HOME` (`config.toml` + `auth.json`, plus `models.json` when the catalog renders) | yes        |
+| codex-gui | sandbox: `CODEX_HOME` (`config.toml`, plus `models.json` when the catalog renders; no `auth.json`) | yes   |
 | cline    | sandbox: `CLINE_DATA_DIR` (`providers.json`)            | yes        |
 | droid    | sandbox: HOME (`.factory/settings.json`)                | yes        |
 | pi       | sandbox: HOME (`.pi/agent/models.json`)                 | yes        |
@@ -283,18 +291,18 @@ Rows that replace `HOME` (droid, openclaw and pi) redirect all of the
 harness's runtime state (sessions, caches) into the sandbox, which is
 discarded when the launch ends.
 
-claude, codex, droid, dsh, omp, openclaw, opencode and pi fetch
+claude, codex, codex-gui, droid, dsh, omp, openclaw, opencode and pi fetch
 the gateway's full model catalog at launch, so the harness's own picker can
 select among gateway models. droid, dsh, omp, openclaw, opencode and pi list
-every served id; codex lists the chat-capable ids when its catalog renders;
-claude renders a bounded four-slot alias picker.
+every served id; codex and codex-gui list the chat-capable ids when their
+catalogs render; claude renders a bounded four-slot alias picker.
 
 A model you pass becomes the default;
 with no model given, droid, dsh, omp, openclaw and pi pin the first real
 id of a fetched catalog as the default
-(claude, codex and opencode never write a default: claude and codex
-refuse a model-less launch outright, so the typed model rides the
-spawn-time wiring, and opencode's own picker decides at startup, a choice
+(claude, codex, codex-gui and opencode never write a default: claude, codex
+and codex-gui refuse a model-less launch outright, so the typed model rides
+the spawn-time wiring, and opencode's own picker decides at startup, a choice
 deliberately held until its boot behaviour is re-verified).
 If the catalog is unavailable (a transient gateway outage) and no model was
 passed, no default is written anywhere and the catalog degrades to the
@@ -306,8 +314,84 @@ themselves with the kya/ provider prefix, so a provider-scoped argument is
 refused at launch. The remaining harnesses wire the model their own way:
 droid takes a bare id on the command line (its CLI refuses scoped
 custom-model ids), dsh carries it in the sandbox config, and claude, cline,
-codex, hermes and qwen take the typed model as their single entry model.
-Check `kyacode models` for the current list.
+codex, codex-gui, hermes and qwen take the typed model as their single entry
+model. Check `kyacode models` for the current list.
+
+### Codex GUI (IDE extension)
+
+`kyacode launch codex-gui <model>` drives the official Codex IDE extension
+(VS Code, Cursor, Windsurf) against the gateway with the same no-pollution
+guarantee as the CLI harnesses: the extension's engine runs under a
+persistent isolated home at `~/.kyacode/codex-gui/` and nothing is ever
+written to `~/.codex`.
+
+The first run: kyacode confirms installing the extension (`code
+--install-extension openai.chatgpt`), installs an engine shim (a second
+copy of the kyacode binary, named `codex(.exe)`, under
+`~/.kyacode/shim/`), materialises the home (config.toml plus the model
+catalog; there is no auth.json, the key never rests in the home), and
+prints the one-time editor setting:
+
+```
+"chatgpt.cliExecutable": "<path to the shim>"
+```
+
+Save that setting (it is application-scoped), keep the Codex setting
+"Run in WSL" OFF (a Windows-side `CODEX_HOME` does not reach a WSL-spawned
+engine), and re-run the launch. From then on, every `kyacode launch
+codex-gui <model>` regenerates the home's wiring and opens a new window on
+the current directory; the extension's model picker lists the gateway's
+chat-capable models.
+
+The engine runs as `codex app-server` inside the editor and keeps running
+after the launch returns. Two consequences:
+
+- One live server per home: a second window's engine is refused with a
+  recovery instruction (close the Codex panel or run `Developer: Reload
+  Window` first). A launch while a server is live refuses the same way,
+  because the wiring is only read at server startup: re-run the launch
+  after the reload to apply new wiring.
+- The key is read from `~/.kyacode/token` at every engine spawn, so
+  `kyacode auth` and `kyacode unauth` take effect on the next spawn
+  without touching the editor.
+
+To return the extension to vanilla codex, remove the shim's enable flag
+(`~/.kyacode/shim/enabled`): the shim then passes every spawn through to
+the recorded (or PATH) codex with the environment unchanged, and you can
+clear the setting.
+
+### Codex GUI (desktop app, experimental)
+
+The ChatGPT desktop app's Codex view can run on the gateway too. The
+mechanism is different from the extension's: MSIX activation rebuilds the
+app's process environment from the registry, so the only channel that
+reaches the host's backend selection is a registry variable,
+`CODEX_CLI_PATH`, pointing at the same engine shim. `kyacode desktop on`
+writes it (refusing to overwrite a foreign value, recording the prior
+state for an exact restore), `kyacode desktop off` unwinds it, and
+`kyacode desktop status` reports every layer.
+
+The shim decides at spawn time what a desktop spawn means, by walking its
+ancestor chain:
+
+| spawned by | command line marker | engine behaviour |
+|---|---|---|
+| gateway instance (via `kyacode desktop open`) | the dedicated profile dir (`~/.kyacode/codex-gui-electron`) | gateway wiring: the persistent home, the key from `~/.kyacode/token`, one live engine per home |
+| your everyday desktop instance | no marker | vanilla passthrough to the desktop's own managed runtime, environment untouched |
+| (cloud `exec-server` spawns) | gateway instance only | refused with a note: cloud environments are unavailable in gateway mode |
+
+`kyacode desktop open` launches a gateway instance on the dedicated
+electron profile, so it can run side by side with your everyday signed-in
+app. The everyday instance keeps its ChatGPT sign-in and its real
+`~/.codex` wiring byte-for-byte; mixing the two is what the shim's
+discrimination prevents (a signed-in instance pointed at the key-free
+gateway home stalls on its account load).
+
+Known boundaries: the desktop's computer-use/browser helper hard-codes
+the real `~/.codex` path into its own plugin configuration (the main
+reasoning chain stays isolated; the helper's writes are not); the desktop
+cloud environments never engage in gateway mode; and the desktop's
+ChatGPT-account features (memory, usage page) are absent there by design.
 
 ### 1M context with Claude Code
 

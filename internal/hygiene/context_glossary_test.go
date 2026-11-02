@@ -115,7 +115,7 @@ func TestContextGlossaryPlacementListMatchesTheHeldSplit(t *testing.T) {
 	for _, clause := range []string{
 		"pi, dsh and droid pin bare",
 		"omp and openclaw pin scoped",
-		"claude and codex read no pin — their entry model rides their own spawn-time wiring",
+		"claude, codex and codex-gui read no pin — their entry models ride their own spawn-time wiring",
 		"opencode reads no pin — held",
 	} {
 		if !strings.Contains(entry, clause) {

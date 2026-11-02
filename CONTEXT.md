@@ -9,7 +9,7 @@ the harness's real config.
 ### Launching a harness
 
 **Harness**:
-An external coding-agent CLI that kyacode launches (claude, codex, dsh, hermes, omp, droid, pi, openclaw, cline, opencode, qwen).
+An external coding-agent CLI that kyacode launches (claude, codex, codex-gui, dsh, hermes, omp, droid, pi, openclaw, cline, opencode, qwen).
 _Avoid_: agent, CLI, tool
 
 **Runner**:
@@ -93,11 +93,11 @@ The merged model directory a harness config carries: the CLI-chosen model first,
 _Avoid_: model list, picker
 
 **Catalog carrier**:
-A runner whose config embeds the model catalog fetched from the gateway's model list at launch. Declared on its Spec by the carrier channel it sets — CarrierBuild (sandbox-wired) or CarrierEnv (env-wired); a carrier never fetches itself. Whether a carrier may also declare RequiresModel is a carrier-body property, not a declaration check: its wiring must serve every catalog row it renders into its picker (codex and claude hold the pairing — one provider and one key carry every row). Membership is not placement: a carrier that renders its entry model through its own spawn-time wiring (claude's ANTHROPIC_MODEL pin, codex's config `model`) consumes no default pin from the Catalog decision.
+A runner whose config embeds the model catalog fetched from the gateway's model list at launch. Declared on its Spec by the carrier channel it sets — CarrierBuild (sandbox-wired) or CarrierEnv (env-wired); a carrier never fetches itself. Whether a carrier may also declare RequiresModel is a carrier-body property, not a declaration check: its wiring must serve every catalog row it renders into its picker (codex, codex-gui and claude hold the pairing — one provider and one key carry every row). Membership is not placement: a carrier that renders its entry model through its own spawn-time wiring (claude's ANTHROPIC_MODEL pin, codex's and codex-gui's config `model`) consumes no default pin from the Catalog decision.
 _Avoid_: model-aware runner, dynamic runner
 
 **Catalog decision**:
-The per-launch resolved value the launch boundary hands a Catalog carrier: the merged rows plus the default-pin verdict rendered in both forms (bare and provider-scoped). Resolved once by Resolve — only for a carrier — and opaque to carriers: the Sentinel row and the no-pin-on-degrade pairing are decided there, never re-derived from the rows a carrier received; the pin's FORM stays placement knowledge, read from how each carrier consumes the decision (pi, dsh and droid pin bare; omp and openclaw pin scoped; claude and codex read no pin — their entry model rides their own spawn-time wiring; opencode reads no pin — held).
+The per-launch resolved value the launch boundary hands a Catalog carrier: the merged rows plus the default-pin verdict rendered in both forms (bare and provider-scoped). Resolved once by Resolve — only for a carrier — and opaque to carriers: the Sentinel row and the no-pin-on-degrade pairing are decided there, never re-derived from the rows a carrier received; the pin's FORM stays placement knowledge, read from how each carrier consumes the decision (pi, dsh and droid pin bare; omp and openclaw pin scoped; claude, codex and codex-gui read no pin — their entry models ride their own spawn-time wiring; opencode reads no pin — held).
 _Avoid_: fetched catalog (bare), catalog value, dossier
 
 **Sentinel row**:
