@@ -33,10 +33,17 @@ func cmdClaudeDesktop(args []string, ch channels) error {
 	switch action {
 	case "on":
 		// The shape gate bounds the rest at one: the optional model pins
-		// the picker's default (the config's first entry).
+		// the picker's default (the config's first entry). An argument
+		// that trims to empty is the quoting-bug family (a wrapping
+		// script's "$MODEL" with the variable unset), and it must refuse
+		// ahead of the endpoint resolution, never silently degrade into
+		// the catalog's sorted-first default.
 		model := ""
 		if len(rest) == 1 {
 			model = strings.TrimSpace(rest[0])
+			if model == "" {
+				return fmt.Errorf("empty <model> argument")
+			}
 		}
 		return cmdClaudeDesktopOn(model, ch)
 	case "off":

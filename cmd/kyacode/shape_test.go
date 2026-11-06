@@ -116,6 +116,21 @@ func TestClaudeDesktopModellessActionsRefuseTheModel(t *testing.T) {
 	}
 }
 
+// `on` with an argument that trims to empty is the quoting-bug family
+// (`launch claude "$MODEL"` with the variable unset): it must refuse
+// ahead of the endpoint resolution, never silently degrade into the
+// catalog's sorted-first default. The guard fires before any endpoint
+// or config read, so the hermetic home suffices.
+func TestClaudeDesktopOnRefusesAnEmptyModelArgument(t *testing.T) {
+	withHermeticHome(t)
+	for _, arg := range []string{"", "   "} {
+		err := run([]string{"claude-desktop", "on", arg}, nil, silentChannels)
+		if err == nil || err.Error() != "empty <model> argument" {
+			t.Errorf("claude-desktop on %q: refusal = %v, want the exact empty-model sentence", arg, err)
+		}
+	}
+}
+
 // Help-first is a row property the gate honors before anything else:
 // the two data movers print usage and run nothing (their action-level
 // behavior is pinned at spawn level in main_test.go; here the row is

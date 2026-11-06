@@ -86,13 +86,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          # Pinned to 1.27.0 for the lint leg only: staticcheck v0.8.1 (the
-          # latest release) reads stdlib export data up to version 4, and
-          # go1.27.2's compiler emits version 5 — the toolchain bump that
-          # fixed the govulncheck findings broke this leg's reader, not the
-          # lint itself. Raise the pin when a staticcheck release supports
-          # the new export data.
-          go-version: "1.27.0"
+          # The module's own toolchain: staticcheck v0.8.2 reads the export
+          # data it emits. The former 1.27.0 pin existed only for v0.8.1's
+          # version-4 ceiling and is gone with that ceiling.
+          go-version-file: go.mod
 
       - name: Staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
