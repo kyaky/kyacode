@@ -414,6 +414,12 @@ binary as its credential helper, and `kyacode claude-desktop-cred`
 prints the token from `~/.kyacode/token` at call time, so `kyacode
 auth` and `kyacode unauth` take effect on the helper's next call.
 
+The picker's default is the list's first entry. Pass an optional model
+to `on` to pin it to your choice: `kyacode claude-desktop on <model>`.
+Without it the default is the alphabetically first chat id the gateway
+serves. The rest of the chat catalog still lists either way, because the
+picker's rows are your choices, not defaults.
+
 `kyacode claude-desktop open` launches the app (quit any running
 instance first: 3P applies at launch); `claude-desktop off` removes the
 two files and the app returns to its sign-in screen. If the in-app

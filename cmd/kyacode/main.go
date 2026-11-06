@@ -129,9 +129,11 @@ Usage:
   kyacode desktop on|off|status|open
                              Wire, unwire, inspect or launch the ChatGPT
                              desktop app on the gateway (experimental)
-  kyacode claude-desktop on|off|status|open
+  kyacode claude-desktop on [model]|off|status|open
                              Wire, unwire, inspect or launch the Claude
-                             desktop app on the gateway (experimental)
+                             desktop app on the gateway (experimental);
+                             on takes an optional model that pins the
+                             picker's default (the first entry)
   kyacode claude-desktop-cred
                              Internal: print the gateway token for the
                              desktop credential helper (the app invokes it)

@@ -57,10 +57,11 @@ const (
 type refusalStyle int
 
 const (
-	noArgs        refusalStyle = iota // argumentless: "takes no arguments (got …)"
-	authDataLeaks                     // counted, never echoed; names the sole legal arg
-	exactlyOne                        // bounded data mover: "takes exactly one url (got N: …)"
-	bodyParsed                        // launch: mid-parse guards in the body own the shape
+	noArgs            refusalStyle = iota // argumentless: "takes no arguments (got …)"
+	authDataLeaks                         // counted, never echoed; names the sole legal arg
+	exactlyOne                            // bounded data mover: "takes exactly one url (got N: …)"
+	actionOptionalData                    // action word plus at most one optional data argument
+	bodyParsed                            // launch: mid-parse guards in the body own the shape
 )
 
 // shapeSentinelBodyParsed marks a bodyParsed row: the gate passes the
@@ -75,7 +76,9 @@ type argShape struct {
 	// onlyArg, when non-empty, is the sole spelling of a single
 	// argument (auth's --stdin) — anything else is data-shaped misuse.
 	onlyArg string
-	// noun names what a exactlyOne row takes one of (gateway: "url").
+	// noun names the data argument a exactlyOne row takes one of
+	// (gateway: "url") or an actionOptionalData row takes at most one of
+	// (claude-desktop: "model").
 	// The refusal renders FROM the row — identity literals in the
 	// sentence builder would print one subcommand's refusal for
 	// whatever future row is first declared with the same style.
@@ -113,10 +116,12 @@ var shapeTable = []argShape{
 		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
 	},
 	{
-		// claude-desktop's exactly-one argument is the ACTION (on|off|
-		// status|open), the same body-owned vocabulary as desktop.
-		name: "claude-desktop", maxArgs: 1, helpFirst: true, noun: "action",
-		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
+		// claude-desktop's first argument is the ACTION (on|off|status|
+		// open); `on` takes at most one optional MODEL that pins the
+		// picker's default. The body owns both vocabularies and their
+		// refusals (an unknown action, or a model beside off/status/open).
+		name: "claude-desktop", maxArgs: 2, helpFirst: true, noun: "model",
+		leak: echoFree, style: actionOptionalData, tier: tierFailedCommand,
 	},
 	{
 		// The Claude desktop credential helper: the app invokes this
@@ -217,6 +222,16 @@ func validateShapeTable(rows []argShape) error {
 			if sh.leak != echoFree {
 				return fmt.Errorf("%q: a non-credential argument is printable — leak class must be echoFree", sh.name)
 			}
+		case actionOptionalData:
+			if sh.maxArgs != 2 {
+				return fmt.Errorf("%q: actionOptionalData row is bounded at an action plus one optional argument (declared %d)", sh.name, sh.maxArgs)
+			}
+			if sh.noun == "" {
+				return fmt.Errorf("%q: actionOptionalData refusals render the optional argument's identity — declare its noun", sh.name)
+			}
+			if sh.leak != echoFree {
+				return fmt.Errorf("%q: a non-credential argument is printable — leak class must be echoFree", sh.name)
+			}
 		case bodyParsed:
 			if sh.maxArgs != shapeSentinelBodyParsed {
 				return fmt.Errorf("%q: bodyParsed rows declare the %d sentinel, not a count", sh.name, shapeSentinelBodyParsed)
@@ -264,6 +279,8 @@ func shapeRefusal(sh argShape, rest []string) error {
 		return fmt.Errorf("%s takes no arguments beyond `%s` (got %d) — an inline key is refused by design: credentials in argv leak into shell history; see `kyacode help`", sh.name, sh.onlyArg, len(rest))
 	case exactlyOne:
 		return fmt.Errorf("%s takes exactly one %s (got %d: %s) — see `kyacode help`", sh.name, sh.noun, len(rest), strings.Join(rest, " "))
+	case actionOptionalData:
+		return fmt.Errorf("%s takes an action and at most one %s (got %d: %s) — see `kyacode help`", sh.name, sh.noun, len(rest), strings.Join(rest, " "))
 	default:
 		return fmt.Errorf("internal: subcommand %q has no shape refusal for style %d", sh.name, sh.style)
 	}

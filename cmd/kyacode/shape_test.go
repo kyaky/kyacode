@@ -47,6 +47,7 @@ func TestShapeRowsRefuseThroughRun(t *testing.T) {
 		{[]string{"auth", "--stdin", "extra"}, "auth takes no arguments beyond `--stdin` (got 2) — an inline key is refused by design: credentials in argv leak into shell history; see `kyacode help`"},
 		{[]string{"gateway", "https://a.example", "https://b.example"}, "gateway takes exactly one url (got 2: https://a.example https://b.example) — see `kyacode help`"},
 		{[]string{"launch"}, "usage: kyacode launch <harness> [model] [-- extra args...]"},
+		{[]string{"claude-desktop", "on", "m1", "extra"}, "claude-desktop takes an action and at most one model (got 3: on m1 extra) — see `kyacode help`"},
 	} {
 		err := run(tc.args, nil, silentChannels)
 		if err == nil || err.Error() != tc.want {
@@ -92,6 +93,25 @@ func TestLaunchParseRefusalSentencesArePinned(t *testing.T) {
 		err := run(tc.args, nil, silentChannels)
 		if err == nil || err.Error() != tc.want {
 			t.Errorf("%v: refusal = %v, want the exact parse sentence %q", tc.args, err, tc.want)
+		}
+	}
+}
+
+// The modelless claude-desktop actions refuse a stray model argument in
+// the body (the shape gate bounds the argv at two but cannot know the
+// action/model split): a silent ignore would pin nothing and look like
+// success. The guard fires before any endpoint or config read, so the
+// hermetic home suffices.
+func TestClaudeDesktopModellessActionsRefuseTheModel(t *testing.T) {
+	withHermeticHome(t)
+	for _, args := range [][]string{
+		{"claude-desktop", "off", "m1"},
+		{"claude-desktop", "status", "m1"},
+		{"claude-desktop", "open", "m1"},
+	} {
+		err := run(args, nil, silentChannels)
+		if err == nil || !strings.Contains(err.Error(), "takes no model argument") {
+			t.Errorf("%v: refusal = %v, want the loud stray-model sentence", args, err)
 		}
 	}
 }

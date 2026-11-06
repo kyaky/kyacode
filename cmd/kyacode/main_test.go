@@ -707,6 +707,68 @@ func TestLaunchStillAcceptsScopedFormOnBareComposers(t *testing.T) {
 	}
 }
 
+// `claude-desktop on` takes an optional model that pins the picker's
+// default (the config's first entry) to the operator's choice; the rest
+// of the chat catalog still lists. The drive runs against a loopback
+// gateway double (a bare KYA_GATEWAY would resolve to the real
+// production gateway) and a LOCALAPPDATA temp root, then reads back the
+// applied configuration.
+func TestClaudeDesktopOnPinsTheChosenDefaultModel(t *testing.T) {
+	gateway := gatewaytest.Models(t, "sk-test-123456", []string{"glm-5.3-flash", "qwen3.8-27b", "bge-m3"})
+	local := t.TempDir()
+	e := newCLIEnv(t, gateway.URL).withToken("sk-test-123456")
+	e.env = append(e.env, "LOCALAPPDATA="+local)
+	out, exit := e.run(t, "claude-desktop", "on", "qwen3.8-27b")
+	if exit != 0 {
+		t.Fatalf("claude-desktop on failed: %s", out)
+	}
+	dir := filepath.Join(local, "Claude-3p", "configLibrary")
+	metaRaw, err := os.ReadFile(filepath.Join(dir, "_meta.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta struct {
+		AppliedID string `json:"appliedId"`
+	}
+	if err := json.Unmarshal(metaRaw, &meta); err != nil {
+		t.Fatal(err)
+	}
+	cfgRaw, err := os.ReadFile(filepath.Join(dir, meta.AppliedID+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		InferenceModels []struct {
+			Name string `json:"name"`
+		} `json:"inferenceModels"`
+	}
+	if err := json.Unmarshal(cfgRaw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.InferenceModels) != 2 {
+		t.Fatalf("inferenceModels = %v, want the two chat ids (the embedding family filtered)", cfg.InferenceModels)
+	}
+	if cfg.InferenceModels[0].Name != "qwen3.8-27b" {
+		t.Errorf("picker default = %q, want the model the operator passed", cfg.InferenceModels[0].Name)
+	}
+	if cfg.InferenceModels[1].Name != "glm-5.3-flash" {
+		t.Errorf("second entry = %q, want the remaining chat id in gateway order", cfg.InferenceModels[1].Name)
+	}
+	if !strings.Contains(out, "picker default: qwen3.8-27b") {
+		t.Errorf("stdout %q must name the pinned default", out)
+	}
+
+	// An id the fetched chat list does not serve is refused - a default
+	// naming an unserved id would boot the app into dead calls.
+	out, exit = e.run(t, "claude-desktop", "on", "not-a-model")
+	if exit != 1 {
+		t.Errorf("unknown-model on exit = %d (out %q), want 1", exit, out)
+	}
+	if !strings.Contains(out, "does not serve") {
+		t.Errorf("refusal must name the unserved id, got: %q", out)
+	}
+}
+
 // clinePostInstallPath is where the install-on-miss e2e's post-install Find
 // resolves the freshly-installed cline: beside the stub npm (LookPath, PATH
 // is shimDir in the pathOnly fixture).

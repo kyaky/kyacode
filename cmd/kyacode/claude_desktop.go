@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kyacode/internal/claude3p"
@@ -28,18 +29,45 @@ import (
 )
 
 func cmdClaudeDesktop(args []string, ch channels) error {
-	switch args[0] {
+	action, rest := args[0], args[1:]
+	switch action {
 	case "on":
-		return cmdClaudeDesktopOn(ch)
+		// The shape gate bounds the rest at one: the optional model pins
+		// the picker's default (the config's first entry).
+		model := ""
+		if len(rest) == 1 {
+			model = strings.TrimSpace(rest[0])
+		}
+		return cmdClaudeDesktopOn(model, ch)
 	case "off":
+		if err := modellessRefusal(action, rest); err != nil {
+			return err
+		}
 		return cmdClaudeDesktopOff(ch)
 	case "status":
+		if err := modellessRefusal(action, rest); err != nil {
+			return err
+		}
 		return cmdClaudeDesktopStatus(ch)
 	case "open":
+		if err := modellessRefusal(action, rest); err != nil {
+			return err
+		}
 		return cmdClaudeDesktopOpen(ch)
 	default:
-		return fmt.Errorf("unknown claude-desktop action %q (want on, off, status or open)", args[0])
+		return fmt.Errorf("unknown claude-desktop action %q (want on, off, status or open)", action)
 	}
+}
+
+// modellessRefusal is the loud stray-model guard for the actions that
+// take no model (the shape gate bounds the argv but cannot know the
+// action/model split): a silent ignore would pin nothing and look like
+// success.
+func modellessRefusal(action string, rest []string) error {
+	if len(rest) == 0 {
+		return nil
+	}
+	return fmt.Errorf("claude-desktop %s takes no model argument (got %s) - the optional model belongs to `on`", action, strings.Join(rest, " "))
 }
 
 // cmdClaudeDesktopOn writes the 3P configuration: the model list is
@@ -47,7 +75,12 @@ func cmdClaudeDesktop(args []string, ch channels) error {
 // explicit entries, Claude-recognizable-id discovery would hide every
 // glm/qwen model), the helper is the running kyacode binary, and the
 // app-wide semantics are printed loudly before anything is launched.
-func cmdClaudeDesktopOn(ch channels) error {
+// The optional model argument pins the picker's DEFAULT (the config's
+// first entry) to the operator's choice; the rest of the chat catalog
+// still lists, because the picker's rows are choices, not defaults. An
+// id the fetched chat list does not serve is refused - a default naming
+// an unserved id would boot the app into dead calls.
+func cmdClaudeDesktopOn(model string, ch channels) error {
 	ep, err := resolveEndpoint()
 	if err != nil {
 		return err
@@ -62,6 +95,14 @@ func cmdClaudeDesktopOn(ch channels) error {
 			chat = append(chat, m)
 		}
 	}
+	if model != "" {
+		idx := slices.Index(chat, model)
+		if idx < 0 {
+			return fmt.Errorf("claude-desktop on: the gateway's chat list does not serve %q - check `kyacode models`", model)
+		}
+		rest := slices.Delete(slices.Clone(chat), idx, idx+1)
+		chat = append([]string{model}, rest...)
+	}
 	helper, err := os.Executable()
 	if err != nil {
 		return err
@@ -72,6 +113,13 @@ func cmdClaudeDesktopOn(ch channels) error {
 	}
 	fmt.Fprintln(ch.stdout, "claude desktop wired: the app switches ENTIRELY to the gateway at its next launch")
 	fmt.Fprintf(ch.stdout, "  applied configuration: %s.json (model picker carries %d gateway models, effort up to high)\n", id, len(chat))
+	if len(chat) > 0 {
+		if model != "" {
+			fmt.Fprintf(ch.stdout, "  picker default: %s (your model argument leads the list)\n", chat[0])
+		} else {
+			fmt.Fprintf(ch.stdout, "  picker default: %s (the alphabetically first chat id; pass a model to `on` to pin your own)\n", chat[0])
+		}
+	}
 	fmt.Fprintf(ch.stdout, "  credential: the app calls this kyacode binary as its credential helper - the key lives only in ~/.kyacode/token\n")
 	fmt.Fprintln(ch.stdout, "  semantics: the claude.ai sign-in is bypassed, chat runs on gateway models, cloud environments and Computer Use are unavailable")
 	fmt.Fprintln(ch.stdout, "  launch with: kyacode claude-desktop open")
