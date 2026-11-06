@@ -247,11 +247,6 @@ func resolveDesktopModeDiag() (int, []string) {
 	return desktopModeNone, lines
 }
 
-func resolveDesktopMode() int {
-	m, _ := resolveDesktopModeDiag()
-	return m
-}
-
 // desktopVanillaRuntime resolves the desktop's OWN managed backend
 // runtime: the single codex.exe under %LOCALAPPDATA%\OpenAI\Codex\bin.
 // The rule is the review's: the host-selected runtime must be resolved,

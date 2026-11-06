@@ -8,7 +8,6 @@ import "fmt"
 // behavior that makes the registry the only delivery channel is a
 // Windows fact); elsewhere the command reports that plainly instead of
 // pretending to wire something.
-const desktopEnvName = "CODEX_CLI_PATH"
 
 func DesktopCLIPATHState() (current string, ours bool, err error) {
 	return "", false, nil

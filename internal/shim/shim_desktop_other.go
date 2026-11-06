@@ -16,8 +16,6 @@ const (
 	desktopModeGateway
 )
 
-func resolveDesktopMode() int { return desktopModeNone }
-
 func resolveDesktopModeDiag() (int, []string) { return desktopModeNone, nil }
 
 func desktopVanillaRuntime() (string, bool, error) {
