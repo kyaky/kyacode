@@ -92,6 +92,9 @@ func TestDroidModelArgsBareTheModel(t *testing.T) {
 func TestShellFileRunnerRealKeyEmbedded(t *testing.T) {
 	withHome(t)
 	ep := Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-real-key-9876"}
+	// The codex-gui build resolves its engine through LookPath; the stub
+	// keeps the walk hermetic on machines (and runners) without codex.
+	stubCodexEngine(t)
 
 	// The class-aware rule the closures declare at their buildSandbox
 	// call sites (the Channel enum lives in the sandbox package):
@@ -196,6 +199,9 @@ func TestShellFileRunnerRealKeyEmbedded(t *testing.T) {
 func TestNewSandboxRunners(t *testing.T) {
 	withHome(t)
 	ep := Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-test-12345"}
+	// The codex-gui build resolves its engine through LookPath; the stub
+	// keeps the walk hermetic on machines (and runners) without codex.
+	stubCodexEngine(t)
 
 	sandboxCases := map[string]struct {
 		prefix   string

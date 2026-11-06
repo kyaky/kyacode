@@ -176,6 +176,9 @@ func TestEveryRegistryPrefixMatchesItsOwnMkdirTempShape(t *testing.T) {
 // BuildEnv-built sandbox).
 func TestRunnerSandboxesMatchTheSweepsOwnNamePredicate(t *testing.T) {
 	ep := Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-test-12345"}
+	// The codex-gui build resolves its engine through LookPath; the stub
+	// keeps the walk hermetic on machines (and runners) without codex.
+	stubCodexEngine(t)
 	for _, s := range sandboxRunners() {
 		t.Run(s.Name, func(t *testing.T) {
 			withHome(t)

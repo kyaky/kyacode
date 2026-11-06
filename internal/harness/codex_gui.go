@@ -130,6 +130,13 @@ func matchCodexExtensionLines(out []byte) bool {
 	return false
 }
 
+// findCodexEngine is the GUI build's engine seam: the exact binary the
+// shim records AND the harvest draws from (the certified tuple — one
+// resolution, two consumers). A var seam for the same hermetic reason the
+// harvest arms are vars: a machine without codex installed must be able
+// to drive the GUI build's tests.
+var findCodexEngine = func() (string, bool) { return findIn("codex", nil) }
+
 // codexGuiCarrierBuild materialises the launch's wiring: the lease probe
 // (never regenerate under a live server), the persistent home's managed
 // layer, the engine record, the shim install, and the editor spawn.
@@ -154,9 +161,10 @@ func codexGuiCarrierBuild(ep Endpoint, model string, cat Catalog) (Wire, error) 
 	if err != nil {
 		return Wire{}, err
 	}
-	// The engine: the exact binary recorded for the shim AND harvested
-	// from (the certified tuple — one resolution, two consumers).
-	codexPath, ok := findIn("codex", nil)
+	// The engine rides the seam above: the exact binary recorded for the
+	// shim AND harvested from (the certified tuple — one resolution, two
+	// consumers).
+	codexPath, ok := findCodexEngine()
 	if !ok {
 		return Wire{}, fmt.Errorf("codex engine not found for the GUI home; install it first (see `kyacode status`)")
 	}

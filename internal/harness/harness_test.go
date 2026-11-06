@@ -182,9 +182,12 @@ func TestLauncherFamiliesBuildEnvFailureLeavesNoResidue(t *testing.T) {
 	// (read-only dir at TestCodexBuildEnvCleansUpOnFailedConfigWrite,
 	// in-flight validation at TestCodexBuildEnvCleansUpOnInFlightValidation
 	// Failure) are pinned in the dedicated codex tests above, so the
-	// family map carries the other seven. A registered sandbox runner
-	// with no entry fails with the extend-the-table refusal — the
-	// failure contract must never silently lose a runner.
+	// family map carries the other eight. codex-gui rides the shared
+	// read-only trigger: the probe and sandbox.Named fail under the
+	// read-only .kyacode BEFORE the engine lookup, so its failure shape
+	// needs no engine stub. A registered sandbox runner with no entry
+	// fails with the extend-the-table refusal — the failure contract must
+	// never silently lose a runner.
 	builds := map[string]func(Endpoint, string) (Wire, error){
 		// Carriers ride their declared channel; the catalog value is
 		// irrelevant here — sandbox.New fails before any wiring runs.
@@ -195,6 +198,9 @@ func TestLauncherFamiliesBuildEnvFailureLeavesNoResidue(t *testing.T) {
 		"dsh":      func(ep Endpoint, m string) (Wire, error) { return dshSpec.CarrierBuild(ep, m, degradedCatalog()) },
 		"hermes":   hermesSpec.BuildEnv,
 		"openclaw": func(ep Endpoint, m string) (Wire, error) { return openclawSpec.CarrierBuild(ep, m, degradedCatalog()) },
+		"codex-gui": func(ep Endpoint, m string) (Wire, error) {
+			return codexGuiSpec.CarrierBuild(ep, m, degradedCatalog())
+		},
 	}
 	for _, s := range sandboxRunners() {
 		build, declared := builds[s.Name]
@@ -347,6 +353,26 @@ func stubCodexHarvest(t *testing.T) {
 		codexCatalogEntryHarvest = original
 		codexCatalogEntryHarvestFrom = originalFrom
 	})
+}
+
+// stubCodexEngine puts a do-nothing codex executable at the head of PATH
+// for the test's duration. The codex-gui build resolves its engine
+// through findCodexEngine (LookPath), and a machine without codex
+// installed must build the GUI home exactly like one whose engine probes
+// fail: the version probe records an empty version and the harvest arm
+// returns not-ok — both tolerated shapes — so the stub needs no behavior.
+func stubCodexEngine(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	name := "codex"
+	if runtimeGOOS() == "windows" {
+		name = "codex.exe"
+	}
+	stubPath := filepath.Join(dir, name)
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(filepath.ListSeparator)+os.Getenv("PATH"))
 }
 
 // buildCodexWirePair is the codex wire builder for tests that drive the

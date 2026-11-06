@@ -20,6 +20,7 @@ import (
 func TestCodexGuiBuildWritesTheKeyFreeHome(t *testing.T) {
 	withHome(t)
 	stubCodexHarvest(t)
+	stubCodexEngine(t)
 	w := buildWire(t, codexGuiSpec, Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-test-12345"}, "m1")
 	if filepath.Base(w.Root) != shim.HomeName {
 		t.Fatalf("home dir = %s, want the fixed name %q", w.Root, shim.HomeName)
@@ -131,6 +132,7 @@ func TestMatchCodexExtensionLines(t *testing.T) {
 func TestCodexGuiCleanupKeepsTheHome(t *testing.T) {
 	withHome(t)
 	stubCodexHarvest(t)
+	stubCodexEngine(t)
 	w := buildWire(t, codexGuiSpec, Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-test-12345"}, "m1")
 	w.Cleanup()
 	if _, err := os.Stat(w.Root); err != nil {

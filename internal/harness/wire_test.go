@@ -129,6 +129,9 @@ func TestSequentialLaunchesNeverTradePatchPaths(t *testing.T) {
 // the root naming the declared sandbox prefix.
 func TestLaunchersWiresCarryTheLaunchFacts(t *testing.T) {
 	ep := Endpoint{BaseURL: "https://127.0.0.1:1", Token: "sk-test-12345"}
+	// The codex-gui build resolves its engine through LookPath; the stub
+	// keeps the walk hermetic on machines (and runners) without codex.
+	stubCodexEngine(t)
 	for _, s := range sandboxRunners() {
 		t.Run(s.Name, func(t *testing.T) {
 			home := withHome(t)
@@ -213,8 +216,11 @@ func TestLaunchersWireArgsAreTheRunnerOwnArgv(t *testing.T) {
 	model := "m1"
 	// One stub for the whole table: the codex row's carrier build harvests
 	// the instruction template through the seam, and the real harvest
-	// spawns the installed codex — hermetic tests must not.
+	// spawns the installed codex — hermetic tests must not. The engine
+	// stub rides beside it: codex-gui's build resolves its engine through
+	// LookPath, which must not require an installed codex either.
 	stubCodexHarvest(t)
+	stubCodexEngine(t)
 	for _, s := range sandboxRunners() {
 		t.Run(s.Name, func(t *testing.T) {
 			withHome(t)
