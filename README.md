@@ -157,9 +157,9 @@ issue keys.
 Model ids are gateway-specific: run `kyacode models` to list yours. Note
 that `kyacode models` lists every id the gateway serves, including
 embedding, rerank and speech families no harness can chat with. Only the
-codex catalog and the claude alias picker filter those out (a name
-heuristic; the model you pass explicitly is never overridden); the other
-catalog carriers list every served id, so pass a chat model id.
+codex catalog filters those out (a name heuristic; the model you pass
+explicitly is never overridden); the other catalog carriers list every
+served id, so pass a chat model id.
 
 The default gateway base is the maintainer's own instance (`https://kyaky.ai`,
 not a public service; it needs a key like any other). Point kyacode at any
@@ -293,17 +293,21 @@ Rows that replace `HOME` (droid, openclaw and pi) redirect all of the
 harness's runtime state (sessions, caches) into the sandbox, which is
 discarded when the launch ends.
 
-claude, codex, codex-gui, droid, dsh, omp, openclaw, opencode and pi fetch
+codex, codex-gui, droid, dsh, omp, openclaw, opencode and pi fetch
 the gateway's full model catalog at launch, so the harness's own picker can
 select among gateway models. droid, dsh, omp, openclaw, opencode and pi list
 every served id; codex and codex-gui list the chat-capable ids when their
-catalogs render; claude renders a bounded four-slot alias picker.
+catalogs render. claude fetches no catalog: its session default, its /model
+picker (the four alias slots and the Default row), the legacy small-model
+channel and the subagent default are all pinned to the model you typed at
+launch, so no call channel can name a model the session is not already
+running, however the gateway's catalog or your shell env changes afterwards.
 
 A model you pass becomes the default;
 with no model given, droid, dsh, omp, openclaw and pi pin the first real
 id of a fetched catalog as the default
-(claude, codex, codex-gui and opencode never write a default: claude, codex
-and codex-gui refuse a model-less launch outright, so the typed model rides
+(codex, codex-gui and opencode never write a default: codex and codex-gui
+refuse a model-less launch outright, so the typed model rides
 the spawn-time wiring, and opencode's own picker decides at startup, a choice
 deliberately held until its boot behaviour is re-verified).
 If the catalog is unavailable (a transient gateway outage) and no model was
@@ -448,8 +452,8 @@ kyacode launch claude 'glm-5.3-flash-nvfp4[1m]'
 Two caveats:
 
 - The suffix is read per variable: the `opus`/`sonnet` aliases and `--model`
-  are each read on their own, so for a gateway id keep the suffix on the one
-  you select.
+  are each read on their own. kyacode pins every alias slot to the model you
+  typed, suffix included, so the assumption holds on every row it wires.
 - Claude Code only *assumes* the window. The model must actually serve it
   (`--max-model-len` on the inference side), otherwise a long prompt fails
   with a prompt-too-long error rather than compacting.

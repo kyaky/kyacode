@@ -109,13 +109,13 @@ func TestContextGlossaryPlacementListMatchesTheHeldSplit(t *testing.T) {
 	// readme_wiring_test idiom for held decisions. The CLAUSES are pinned
 	// as substrings, not bare names: presence-only pins survived a swap of
 	// pi and openclaw between the bare and scoped groups when mutation-
-	// tested (2026-10-13 review). claude and codex are placement facts:
-	// they consume no pin, their entry model rides their own spawn-time
-	// wiring.
+	// tested (2026-10-13 review). codex and codex-gui are placement
+	// facts: they consume no pin, their entry model rides their own
+	// spawn-time wiring.
 	for _, clause := range []string{
 		"pi, dsh and droid pin bare",
 		"omp and openclaw pin scoped",
-		"claude, codex and codex-gui read no pin — their entry models ride their own spawn-time wiring",
+		"codex and codex-gui read no pin; their entry models ride their own spawn-time wiring",
 		"opencode reads no pin — held",
 	} {
 		if !strings.Contains(entry, clause) {

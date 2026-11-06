@@ -143,14 +143,13 @@ func TestReadmePinSplitMatchesTheHeldDecision(t *testing.T) {
 	noPin := parseNameList(t, noPinLine[k+1:m])
 
 	// The held decision, pinned deliberately (research §7): opencode
-	// never writes a default. codex, codex-gui and claude join the
-	// no-pin half by their own shape — a model-less launch is refused
-	// outright (RequiresModel), so there is never a fetched-catalog
-	// default to write; the typed model rides the spawn-time wiring
-	// (codex's -c pin, codex-gui's config model, claude's
-	// ANTHROPIC_MODEL) and the catalog's first row is only the picker's
-	// own default.
-	wantNoPin := []string{"claude", "codex", "codex-gui", "opencode"}
+	// never writes a default. codex and codex-gui join the no-pin half
+	// by their own shape — a model-less launch is refused outright
+	// (RequiresModel), so there is never a fetched-catalog default to
+	// write; the typed model rides the spawn-time wiring (codex's -c
+	// pin, codex-gui's config model) and the catalog's first row is only
+	// the picker's own default.
+	wantNoPin := []string{"codex", "codex-gui", "opencode"}
 	if !reflect.DeepEqual(noPin, wantNoPin) {
 		t.Errorf("README no-default exception = %v, want the held decision %v (research §7)", noPin, wantNoPin)
 	}

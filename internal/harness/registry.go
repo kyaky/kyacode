@@ -44,8 +44,8 @@ type Spec struct {
 	// RequiresModel marks runners whose typed model is the entry point:
 	// launch refuses these without an explicit model instead of silently
 	// starting on whatever sorted first in their picker's catalog. The
-	// catalog still serves in-session switching (codex and claude carry
-	// pickers); the typed model is what the operator chose to start on.
+	// catalog still serves in-session switching (codex carries a picker);
+	// the typed model is what the operator chose to start on.
 	RequiresModel bool
 
 	// ScopedComposer: the runner hands the harness the provider-scoped
@@ -109,7 +109,7 @@ type Spec struct {
 	// carrier may also declare RequiresModel is a carrier-body contract,
 	// not a declaration check — the wiring must serve every catalog row
 	// the carrier renders into its picker (see CarrierEnv's doc; codex
-	// and claude both hold it: one provider and one key carry every row).
+	// and codex-gui hold it: one provider and one key carry every row).
 	CarrierBuild func(ep Endpoint, model string, cat Catalog) (Wire, error)
 	// CarrierEnv is Env for an env-wired Catalog carrier (WiringEnv,
 	// opencode's class): same one-Resolve handover as CarrierBuild, on
@@ -117,9 +117,9 @@ type Spec struct {
 	// the wiring this body emits must serve EVERY catalog row the
 	// carrier renders into its harness's picker — the rows are
 	// picker-switchable mid-session, so a carrier whose wiring is
-	// row-specific must not be a carrier (claude's shape: the alias pins
-	// map every picker row onto the wired base+token, and the gateway
-	// serves each row's id). A WiringEnv carrier declares exactly one of Env
+	// row-specific must not be a carrier (opencode's shape: one provider
+	// entry carries the base and key, so every listed row routes through
+	// the same wiring). A WiringEnv carrier declares exactly one of Env
 	// and CarrierEnv; ExtraArgs stays forbidden beside CarrierEnv (the
 	// launcher would never read it — declared-but-unreadable is a
 	// registration error).
@@ -189,10 +189,9 @@ func validate(s Spec) error {
 	// invariant it gestured at — the wiring must serve every catalog row
 	// the picker offers — is a property of the carrier BODY, not of the
 	// declaration, and both shapes that need the combination satisfy it
-	// structurally. codex serves every row through one provider and one
-	// key; claude's alias pins map the picker rows onto the wired
-	// base+token. The contract lives on the CarrierEnv/CarrierBuild docs
-	// where a new carrier author reads it.)
+	// structurally. codex and codex-gui serve every row through one
+	// provider and one key. The contract lives on the CarrierEnv/CarrierBuild
+	// docs where a new carrier author reads it.)
 	if s.Wiring == WiringEnv {
 		if s.Env == nil && s.CarrierEnv == nil {
 			return fmt.Errorf("harness: %q declares WiringEnv with no Env", s.Name)

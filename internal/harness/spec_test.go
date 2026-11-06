@@ -329,7 +329,7 @@ func TestRegisteredSpecsDeclareTheWiringMatrix(t *testing.T) {
 		prefix   string
 		persist  bool // the dir is a fixed-name persistent home, not a throwaway
 	}{
-		{"claude", WiringEnv, true, false, true, false, true, "", false},
+		{"claude", WiringEnv, true, false, false, false, true, "", false},
 		{"opencode", WiringEnv, false, true, true, false, true, "", false},
 		{"codex", WiringSandbox, true, false, true, false, true, "codex", false},
 		{"codex-gui", WiringSandbox, true, false, true, false, true, "codexgui", true},

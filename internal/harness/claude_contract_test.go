@@ -2,7 +2,6 @@ package harness
 
 import (
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -14,7 +13,7 @@ import (
 // /v1/v1/...), a set-but-EMPTY api-key export, and the model-alias pins.
 func TestClaudeEnvCarriesTheBareBaseURL(t *testing.T) {
 	ep := Endpoint{BaseURL: "https://gw.example", Token: "sk-test-12345"}
-	env := claudeSpec.CarrierEnv(ep, "m1", Catalog{ids: []string{"m1"}, pin: "m1"})
+	env := claudeSpec.Env(ep, "m1")
 	if !slices.Contains(env, "ANTHROPIC_BASE_URL=https://gw.example") {
 		t.Errorf("env = %v, want the exact bare-base row (claude appends /v1/messages itself; an OpenAI-style /v1 base would double the suffix)", env)
 	}
@@ -28,7 +27,7 @@ func TestClaudeEnvCarriesTheBareBaseURL(t *testing.T) {
 // gateway.
 func TestClaudeEnvSuppressesAmbientAPIKeyWithAnEmptyValue(t *testing.T) {
 	ep := Endpoint{BaseURL: "https://gw.example", Token: "sk-test-12345"}
-	env := claudeSpec.CarrierEnv(ep, "m1", Catalog{ids: []string{"m1"}, pin: "m1"})
+	env := claudeSpec.Env(ep, "m1")
 	if !slices.Contains(env, "ANTHROPIC_API_KEY=") {
 		t.Fatalf("env has no ANTHROPIC_API_KEY row at all: %v — the empty-export suppression must stay set, not omitted", env)
 	}
@@ -37,59 +36,72 @@ func TestClaudeEnvSuppressesAmbientAPIKeyWithAnEmptyValue(t *testing.T) {
 	}
 }
 
-// The degraded single-row catalog (Resolve's outage shape) pins every
-// alias slot to the launched id — the pre-carrier shape: an outage
-// degrades the picker, never the wiring.
-func TestClaudeCarrierEnvDegradesToLaunchedModelOnEveryAlias(t *testing.T) {
+// The model contract is ONE model, the typed one: ANTHROPIC_MODEL, the
+// picker's Default row, the legacy small-model channel, all four picker
+// aliases (each with its label overrides) and the subagent default pin
+// the same id, and the builder takes no catalog at all. The rotation this
+// replaced filled the non-entry slots from the fetched catalog's sorted
+// remainder, models the operator never chose; a slot whose model the
+// gateway later dropped died mid-session. The pinned shape can only name
+// a model the operator's launch already runs, so the [1m] context suffix
+// rides through on every row verbatim.
+func TestClaudeEnvPinsEveryAliasAndTheSubagentToTheTypedModel(t *testing.T) {
 	ep := Endpoint{BaseURL: "https://gw.example", Token: "sk-test-12345"}
-	env := claudeSpec.CarrierEnv(ep, "glm-5.3-flash-nvfp4", Catalog{ids: []string{"glm-5.3-flash-nvfp4"}, pin: "glm-5.3-flash-nvfp4"})
-	joined := strings.Join(env, "\n")
+	env := claudeSpec.Env(ep, "glm-5.3-flash[1m]")
 	for _, row := range []string{
-		"ANTHROPIC_MODEL=glm-5.3-flash-nvfp4",
-		"ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5.3-flash-nvfp4",
-		"ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5.3-flash-nvfp4",
-		"ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-5.3-flash-nvfp4",
-		"ANTHROPIC_DEFAULT_FABLE_MODEL=glm-5.3-flash-nvfp4",
-		"CLAUDE_CODE_SUBAGENT_MODEL=glm-5.3-flash-nvfp4",
+		"ANTHROPIC_MODEL=glm-5.3-flash[1m]",
+		"ANTHROPIC_DEFAULT_MODEL=glm-5.3-flash[1m]",
+		"ANTHROPIC_SMALL_FAST_MODEL=glm-5.3-flash[1m]",
+		"CLAUDE_CODE_SUBAGENT_MODEL=glm-5.3-flash[1m]",
 	} {
-		if !strings.Contains(joined, row) {
-			t.Errorf("env missing the pin %q (got %v)", row, env)
+		if !slices.Contains(env, row) {
+			t.Errorf("env missing the pinned row %q (got %v)", row, env)
+		}
+	}
+	for _, alias := range []string{"OPUS", "SONNET", "HAIKU", "FABLE"} {
+		for _, row := range []string{
+			"ANTHROPIC_DEFAULT_" + alias + "_MODEL=glm-5.3-flash[1m]",
+			"ANTHROPIC_DEFAULT_" + alias + "_MODEL_NAME=glm-5.3-flash[1m]",
+			"ANTHROPIC_DEFAULT_" + alias + "_MODEL_DESCRIPTION=KYA gateway model",
+		} {
+			if !slices.Contains(env, row) {
+				t.Errorf("env missing the pinned row %q (got %v)", row, env)
+			}
 		}
 	}
 }
 
-// The carrier rotation is the picker feature: the launched model takes
-// the opus slot (the entry choice) and heads the rows; sonnet/haiku/fable
-// fill from the remaining chat rows in gateway order, skipping the
-// non-chat families; every pinned row carries its label override so the
-// picker shows the real id.
-func TestClaudeCarrierEnvRotatesThePickerAliasesAcrossTheCatalog(t *testing.T) {
+// The model-choice rows are emitted UNCONDITIONALLY: the child inherits
+// the operator's ambient shell env, and an inherited ANTHROPIC_DEFAULT_MODEL
+// or ANTHROPIC_SMALL_FAST_MODEL naming another valid gateway id would let
+// the picker's Default choice or a background small call reach a model the
+// launch never chose. The builder never reads the ambient env; Go's
+// os/exec keeps the last value for a duplicated key, so the pinned rows
+// always win over whatever the shell exported.
+func TestClaudeEnvModelRowsSurviveAmbientInheritance(t *testing.T) {
+	t.Setenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+	t.Setenv("ANTHROPIC_DEFAULT_MODEL", "qwen3.8-27b")
+	t.Setenv("ANTHROPIC_SMALL_FAST_MODEL", "qwen3.8-flash-next")
 	ep := Endpoint{BaseURL: "https://gw.example", Token: "sk-test-12345"}
-	cat := Catalog{ids: []string{
-		"glm-5.3-flash",      // the launched model — Resolve puts it first
-		"glm-5.3",            // operator-excluded id: filtered
-		"bge-m3",             // non-chat family: filtered
-		"qwen3.8-27b",        // kept
-		"qwen3-asr-1.7b",     // non-chat family: filtered
-		"qwen3.8-flash-next", // kept
-	}, pin: "glm-5.3-flash"}
-	env := claudeSpec.CarrierEnv(ep, "glm-5.3-flash", cat)
-	joined := strings.Join(env, "\n")
+	env := claudeSpec.Env(ep, "glm-5.3-flash[1m]")
 	for _, row := range []string{
-		"ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5.3-flash",
-		"ANTHROPIC_DEFAULT_SONNET_MODEL=qwen3.8-27b",
-		"ANTHROPIC_DEFAULT_HAIKU_MODEL=qwen3.8-flash-next",
-		"ANTHROPIC_DEFAULT_FABLE_MODEL=glm-5.3-flash", // rows exhausted — the entry model fills the last slot
-		"ANTHROPIC_DEFAULT_SONNET_MODEL_NAME=qwen3.8-27b",
-		"ANTHROPIC_DEFAULT_FABLE_MODEL_DESCRIPTION=KYA gateway model",
+		"ANTHROPIC_MODEL=glm-5.3-flash[1m]",
+		"ANTHROPIC_DEFAULT_MODEL=glm-5.3-flash[1m]",
+		"ANTHROPIC_SMALL_FAST_MODEL=glm-5.3-flash[1m]",
 	} {
-		if !strings.Contains(joined, row) {
-			t.Errorf("env missing the rotated pin %q (got %v)", row, env)
+		if !slices.Contains(env, row) {
+			t.Errorf("an ambient model var leaked past the pin: env = %v, want %q present", env, row)
 		}
 	}
-	for _, leaked := range []string{"bge-m3", "qwen3-asr", "_SONNET_MODEL=glm-5.3\n", "_SONNET_MODEL=glm-5.3-fast"} {
-		if strings.Contains(joined, leaked) {
-			t.Errorf("env leaked an excluded row into the picker rotation: %v", env)
-		}
+}
+
+// A model-less claude launch is refused upstream (RequiresModel), so the
+// builder's model-less shape is the credential rows alone: no half-pinned
+// aliases pointing at a model nobody typed.
+func TestClaudeEnvWithoutAModelCarriesOnlyTheCredentialRows(t *testing.T) {
+	ep := Endpoint{BaseURL: "https://gw.example", Token: "sk-test-12345"}
+	env := claudeSpec.Env(ep, "")
+	if len(env) != 3 {
+		t.Fatalf("env = %v, want exactly the three credential rows", env)
 	}
 }

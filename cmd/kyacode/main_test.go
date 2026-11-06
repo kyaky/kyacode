@@ -563,10 +563,10 @@ func TestStatusSurfacesUnreadableTokenInsteadOfNotStored(t *testing.T) {
 }
 
 // The whole child argv for `launch claude m1 -- --flag value` is exactly
-// [--flag value]: the model rides the ANTHROPIC_MODEL env row since the
-// carrier conversion (claude's picker aliases make --model redundant),
-// everything after the first `--` rides as-is. A stub claude on PATH
-// prints its own argv.
+// [--flag value]: the model rides the ANTHROPIC_MODEL env row (claude's
+// spawn-time env rows pin the model on every channel, so argv
+// carries no --model), everything after the first `--` rides as-is. A
+// stub claude on PATH prints its own argv.
 func TestLaunchDashDashPassthroughFollowsTheSplit(t *testing.T) {
 	shimDir := t.TempDir()
 	stubHarness(t, shimDir, "claude")

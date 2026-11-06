@@ -234,11 +234,10 @@ var gatewayNonChatFragments = []string{
 
 // GatewayChatModel reports whether a gateway model id belongs to a family
 // a harness can actually serve on its chat wire. Exported because two
-// carriers consume it (the codex catalog renderer and the claude alias
-// rotation); the fragments are gateway-wide facts, not per-harness ones.
-// Operator exclusions (claude's Mistral pair) live with the carrier that
-// mandated them — the codex catalog deliberately shows every chat-capable
-// id the key can reach, dynamically.
+// surfaces consume it (the codex catalog renderer and cmd's claude-desktop
+// wiring); the fragments are gateway-wide facts, not per-harness ones.
+// The codex catalog deliberately shows every chat-capable id the key can
+// reach, dynamically.
 func GatewayChatModel(id string) bool {
 	lowered := strings.ToLower(id)
 	for _, fragment := range gatewayNonChatFragments {
