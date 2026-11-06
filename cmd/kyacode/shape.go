@@ -113,6 +113,20 @@ var shapeTable = []argShape{
 		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
 	},
 	{
+		// claude-desktop's exactly-one argument is the ACTION (on|off|
+		// status|open), the same body-owned vocabulary as desktop.
+		name: "claude-desktop", maxArgs: 1, helpFirst: true, noun: "action",
+		leak: echoFree, style: exactlyOne, tier: tierFailedCommand,
+	},
+	{
+		// The Claude desktop credential helper: the app invokes this
+		// binary with the configured args and reads the bare token from
+		// stdout. Argumentless by contract; the argv gate exists so a
+		// stray argument is a loud refusal, never a silent ignore.
+		name: "claude-desktop-cred", maxArgs: 0,
+		leak: echoFree, style: noArgs, tier: tierFailedCommand,
+	},
+	{
 		name: "doctor", maxArgs: 0,
 		leak: echoFree, style: noArgs, tier: tierFailedCommand,
 	},

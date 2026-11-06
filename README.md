@@ -191,6 +191,8 @@ without it.
 | `kyacode models`                                 | list gateway models (10s timeout)                                                                 |
 | `kyacode launch <harness> [model] [-- extra args...]` | spawn a harness against the gateway                                                          |
 | `kyacode desktop on\|off\|status\|open`          | wire, unwire, inspect or launch the ChatGPT desktop app on the gateway (experimental)             |
+| `kyacode claude-desktop on\|off\|status\|open`   | wire, unwire, inspect or launch the Claude desktop app on the gateway (experimental)              |
+| `kyacode claude-desktop-cred`                    | internal: prints the gateway token for the desktop credential helper                              |
 | `kyacode version`                                | print the build's version (tagged releases stamp semver)                                          |
 | `kyacode help`                                   | usage (`-h` / `--help`)                                                                           |
 
@@ -392,6 +394,34 @@ the real `~/.codex` path into its own plugin configuration (the main
 reasoning chain stays isolated; the helper's writes are not); the desktop
 cloud environments never engage in gateway mode; and the desktop's
 ChatGPT-account features (memory, usage page) are absent there by design.
+
+### Claude desktop (experimental)
+
+The Claude Desktop app's Code tab runs on the gateway through the app's
+own third-party-inference (3P) configuration. The mechanism is pure
+configuration: `kyacode claude-desktop on` writes two files under
+`%LOCALAPPDATA%\Claude-3p\configLibrary` (the app's own managed store,
+excluded from MSIX virtualization in the app's manifest) and the app
+reads them at its next launch. Nothing is written to `~/.claude` or to
+the real Claude profile.
+
+The credential never rests in the config: the app invokes this kyacode
+binary as its credential helper, and `kyacode claude-desktop-cred`
+prints the token from `~/.kyacode/token` at call time, so `kyacode
+auth` and `kyacode unauth` take effect on the helper's next call.
+
+`kyacode claude-desktop open` launches the app (quit any running
+instance first: 3P applies at launch); `claude-desktop off` removes the
+two files and the app returns to its sign-in screen. If the in-app
+configuration window writes its own configuration afterwards, `status`
+reports the takeover and `on` refuses until it is removed.
+
+One trade-off to know before `on`: Claude's 3P mode is app-wide. The
+claude.ai sign-in is bypassed, chat runs on the gateway models too
+(the profile keeps the Chat tab alive for that), and cloud environments
+plus Computer Use are unavailable. The gateway models appear in the
+picker with effort up to high; context-window assumptions follow the
+mapped Claude model in this first version.
 
 ### 1M context with Claude Code
 

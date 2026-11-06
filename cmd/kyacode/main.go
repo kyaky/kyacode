@@ -90,6 +90,10 @@ func run(args []string, h *ladder.Handoff, ch channels) error {
 		err = runShape("gateway", args[1:], ch, cmdGateway)
 	case "desktop":
 		err = runShape("desktop", args[1:], ch, cmdDesktop)
+	case "claude-desktop":
+		err = runShape("claude-desktop", args[1:], ch, cmdClaudeDesktop)
+	case "claude-desktop-cred":
+		err = runShape("claude-desktop-cred", args[1:], ch, func(rest []string, ch channels) error { return cmdClaudeDesktopCred(ch) })
 	case "doctor":
 		err = runShape("doctor", args[1:], ch, func(_ []string, ch channels) error { return cmdDoctor(ch) })
 	case "status":
@@ -125,6 +129,12 @@ Usage:
   kyacode desktop on|off|status|open
                              Wire, unwire, inspect or launch the ChatGPT
                              desktop app on the gateway (experimental)
+  kyacode claude-desktop on|off|status|open
+                             Wire, unwire, inspect or launch the Claude
+                             desktop app on the gateway (experimental)
+  kyacode claude-desktop-cred
+                             Internal: print the gateway token for the
+                             desktop credential helper (the app invokes it)
   kyacode version           Print the build's version
   kyacode help              Show this usage (-h / --help)
 

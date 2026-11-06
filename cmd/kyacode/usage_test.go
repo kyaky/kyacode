@@ -93,7 +93,9 @@ func TestUsageCommandsMatchTheShapeTable(t *testing.T) {
 		t.Fatal("usage lost its Usage block")
 	}
 	var got []string
-	for _, m := range regexp.MustCompile(`kyacode ([a-z]+)`).FindAllStringSubmatch(text[i:j], -1) {
+	// Subcommand names carry hyphens now (claude-desktop and its
+	// credential helper); the token regex follows the name grammar.
+	for _, m := range regexp.MustCompile(`kyacode ([a-z-]+)`).FindAllStringSubmatch(text[i:j], -1) {
 		got = append(got, m[1])
 	}
 	slices.Sort(got)
@@ -130,11 +132,12 @@ func TestReadmeCommandsMatchTheShapeTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []string
+	// The README commands table carries hyphenated subcommand names too.
 	for _, line := range strings.Split(string(b), "\n") {
 		if !strings.HasPrefix(line, "| `kyacode ") {
 			continue
 		}
-		m := regexp.MustCompile("`kyacode ([a-z]+)").FindStringSubmatch(line)
+		m := regexp.MustCompile("`kyacode ([a-z-]+)").FindStringSubmatch(line)
 		if m == nil {
 			t.Fatalf("README commands row %q has no kyacode <name> token", line)
 		}
